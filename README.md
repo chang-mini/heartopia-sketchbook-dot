@@ -24,6 +24,11 @@
 
 - [페이지 바로가기](https://chang-mini.github.io/heartopia-sketchbook-dot/)
 
+## 후원
+
+- [GitHub Sponsors로 후원하기](https://github.com/sponsors/chang-mini)
+- 이 도구가 계속 업데이트될 수 있도록 후원으로 응원할 수 있습니다.
+
 ## 기술 메모
 
 - 정적 웹앱입니다.
