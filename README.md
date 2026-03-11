@@ -20,9 +20,9 @@
 4. 오른쪽 팔레트에서 사용된 색상 코드를 확인합니다.
 5. 필요하면 저장 버튼으로 현재 결과를 파일로 저장합니다.
 
-## 배포 주소
+## 도트변환 사이트
 
-- [페이지 바로가기](https://chang-mini.github.io/heartopia-sketchbook-dot/)
+- [사이트 바로가기](https://chang-mini.github.io/heartopia-sketchbook-dot/)
 
 ## 후원
 
