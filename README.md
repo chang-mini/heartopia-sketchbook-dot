@@ -22,7 +22,7 @@
 
 ## 배포 주소
 
-- GitHub Pages: `https://chang-mini.github.io/heartopia-sketchbook-dot/`
+- [페이지 바로가기](https://chang-mini.github.io/heartopia-sketchbook-dot/)
 
 ## 기술 메모
 
