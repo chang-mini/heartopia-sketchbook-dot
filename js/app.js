@@ -1483,14 +1483,15 @@ function updateViewerNote() {
 
   const activeColorCodes = getActivePaletteCodes();
   const activeColorProgress = getActiveColorProgressText();
+  const spacer = "\u00A0\u00A0";
   if (activeColorCodes.length > 1 && viewerState.activeColorCode) {
-    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요. ${activeColorCodes.length}색 표시 중 · 현재 ${viewerState.activeColorCode}${activeColorProgress} · 표시된 칸은 클릭해서 흐리게 체크할 수 있습니다.`;
+    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요.\n${activeColorCodes.length}색 표시 중${spacer}현재 ${viewerState.activeColorCode}${activeColorProgress}\n클릭해서 흐리게 체크할 수 있습니다.`;
     return;
   }
 
   if (viewerState.activeColorCode) {
     const color = viewerState.paletteByCode.get(viewerState.activeColorCode);
-    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요. ${color?.code || viewerState.activeColorCode}만 보기${activeColorProgress} · 표시된 칸은 클릭해서 흐리게 체크할 수 있습니다.`;
+    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요.\n현재 ${color?.code || viewerState.activeColorCode}${activeColorProgress}\n클릭해서 흐리게 체크할 수 있습니다.`;
     return;
   }
 
@@ -1514,7 +1515,7 @@ function getActiveColorProgressText() {
     return "";
   }
 
-  return ` · ${totalCount}칸 중 ${remainingCount}칸 남음`;
+  return `\u00A0\u00A0${totalCount}칸 중 ${remainingCount}칸 남음`;
 }
 
 function countCompletedCellsForCode(targetCode) {
