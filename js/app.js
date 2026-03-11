@@ -1397,6 +1397,7 @@ function drawGuideCanvas() {
       const isCurrentMatch = Boolean(activeColorCode) && code === activeColorCode;
       const isPreviousMatch = !isCurrentMatch && selectedCodeSet.has(code);
       const isMatch = !isFiltering || isCurrentMatch || isPreviousMatch;
+      const showCompletedFade = isFiltering && isCompleted;
       const baseFill = !isFiltering
         ? color?.hex_value || "#ffffff"
         : isCurrentMatch
@@ -1404,12 +1405,12 @@ function drawGuideCanvas() {
           : isPreviousMatch
             ? mixHexColors(color?.hex_value || "#ffffff", "#f8f0e7", 0.86)
             : "rgba(248,240,231,.82)";
-      guideContext.fillStyle = isCompleted ? mixHexColors(baseFill, "#f8f0e7", 0.72) : baseFill;
+      guideContext.fillStyle = showCompletedFade ? mixHexColors(baseFill, "#f8f0e7", 0.72) : baseFill;
       guideContext.fillRect(x, y, cellSize + 0.6, cellSize + 0.6);
 
       if (isMatch && cellSize >= 16) {
         guideContext.save();
-        if (isCompleted) {
+        if (showCompletedFade) {
           guideContext.globalAlpha = 0.28;
         } else if (isPreviousMatch) {
           guideContext.globalAlpha = 0.24;
@@ -1427,7 +1428,7 @@ function drawGuideCanvas() {
         guideContext.restore();
       }
 
-      if (isCompleted && isCurrentMatch && cellSize >= 10) {
+      if (showCompletedFade && isCurrentMatch && cellSize >= 10) {
         guideContext.save();
         guideContext.strokeStyle = "rgba(86, 69, 55, .34)";
         guideContext.lineWidth = Math.max(1.5, cellSize * 0.08);
