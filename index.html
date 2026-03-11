@@ -334,6 +334,17 @@
       font-size: 13px;
     }
 
+    .runtime-hint {
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(187, 92, 50, .16);
+      background: linear-gradient(180deg, rgba(255, 244, 232, .96), rgba(249, 235, 220, .92));
+      color: var(--muted-strong);
+      font-size: 12px;
+      line-height: 1.55;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6);
+    }
+
     .setup-grid {
       display: grid;
       width: 100%;
@@ -1207,6 +1218,7 @@
                 </select>
               </div>
               <button id="submit-button" type="button">도안 생성 시작</button>
+              <p class="runtime-hint" id="runtime-hint">첫 실행은 Python 엔진과 Pillow를 브라우저에 불러오느라 조금 느릴 수 있습니다.</p>
             </form>
           </section>
 

@@ -1,4 +1,4 @@
-import { PALETTE, PALETTE_ORDER, getPreset } from "./config.js";
+import { getPreset } from "./config.js";
 
 const form = document.getElementById("conversion-form");
 const imageInput = document.getElementById("image");
@@ -18,6 +18,7 @@ const viewerNote = document.getElementById("viewer-note");
 const saveCurrentButton = document.getElementById("save-current");
 const savedFileInput = document.getElementById("saved-file");
 const savedStatus = document.getElementById("saved-status");
+const runtimeHint = document.getElementById("runtime-hint");
 const guideViewport = document.getElementById("guide-viewport");
 const guideCanvas = document.getElementById("guide-canvas");
 const guideEmpty = document.getElementById("guide-empty");
@@ -64,85 +65,8 @@ const paletteState = {
 };
 
 const PYODIDE_INDEX_URL = "https://cdn.jsdelivr.net/pyodide/v0.29.3/full/";
-const PYTHON_CONVERTER_SOURCE = String.raw`
-import json
-from collections import Counter
-from functools import lru_cache
-from PIL import Image, ImageOps
-
-RESAMPLING = getattr(Image, "Resampling", Image)
-
-def convert_dot_snapshot(payload_json):
-    payload = json.loads(payload_json)
-    palette = [
-        {
-            "code": item["code"],
-            "group": item["group"],
-            "hex_value": item["hex_value"],
-            "rgb": tuple(item["rgb"]),
-        }
-        for item in payload["palette"]
-    ]
-
-    @lru_cache(maxsize=65536)
-    def nearest_palette_color(red, green, blue):
-        return min(
-            palette,
-            key=lambda candidate: (
-                ((red - candidate["rgb"][0]) ** 2)
-                + ((green - candidate["rgb"][1]) ** 2)
-                + ((blue - candidate["rgb"][2]) ** 2)
-            ),
-        )
-
-    with Image.open(payload["path"]) as original:
-        corrected = ImageOps.exif_transpose(original)
-        image = corrected.convert("RGBA")
-        background = Image.new("RGBA", image.size, "white")
-        composed = Image.alpha_composite(background, image).convert("RGB")
-        fitted = ImageOps.fit(
-            composed,
-            (int(payload["width"]), int(payload["height"])),
-            method=RESAMPLING.LANCZOS,
-        )
-        source_pixels = list(fitted.getdata())
-
-    width = int(payload["width"])
-    height = int(payload["height"])
-    usage = Counter()
-    grid_codes = []
-
-    for row_index in range(height):
-        row_codes = []
-        start = row_index * width
-        for column_index in range(width):
-            red, green, blue = source_pixels[start + column_index]
-            color = nearest_palette_color(red, green, blue)
-            row_codes.append(color["code"])
-            usage[color["code"]] += 1
-        grid_codes.append(row_codes)
-
-    used_colors = [
-        {
-            "code": color["code"],
-            "group": color["group"],
-            "hex_value": color["hex_value"],
-            "count": usage[color["code"]],
-        }
-        for color in palette
-        if usage[color["code"]] > 0
-    ]
-
-    return json.dumps(
-        {
-            "width": width,
-            "height": height,
-            "used_colors": used_colors,
-            "grid_codes": grid_codes,
-        },
-        ensure_ascii=False,
-    )
-`;
+const PYTHON_MODULE_DIR = "../python";
+const PYTHON_MODULE_FILES = ["palette.py", "presets.py", "converter.py"];
 
 const GROUP_MAIN_COLORS = {
   Black: "#000000",
@@ -753,7 +677,11 @@ async function ensurePythonRuntime() {
     const pyodide = await globalThis.loadPyodide({ indexURL: PYODIDE_INDEX_URL });
     setStatus("런타임 준비 중", "Pillow 패키지를 불러오는 중입니다.", 12);
     await pyodide.loadPackage("pillow");
-    pyodide.runPython(PYTHON_CONVERTER_SOURCE);
+    await syncPythonModules(pyodide);
+    pyodide.runPython("from converter import convert_dot_snapshot");
+    if (runtimeHint) {
+      runtimeHint.textContent = "런타임 준비 완료. 이후 변환은 더 빠르게 시작됩니다.";
+    }
     return pyodide;
   })();
 
@@ -772,9 +700,6 @@ async function convertWithPythonRuntime(pyodide, { file, originalName, ratio, pr
       filename: originalName,
       ratio,
       precision,
-      width: preset.width,
-      height: preset.height,
-      palette: PALETTE,
     });
 
     pyodide.globals.set("conversion_payload_json", payload);
@@ -793,6 +718,30 @@ async function convertWithPythonRuntime(pyodide, { file, originalName, ratio, pr
 
 function buildPythonSafeFilename(filename) {
   return filename.replace(/[^A-Za-z0-9._-]/g, "_");
+}
+
+async function syncPythonModules(pyodide) {
+  const workspaceDir = "/workspace";
+  try {
+    pyodide.FS.mkdir(workspaceDir);
+  } catch {
+  }
+
+  for (const moduleFile of PYTHON_MODULE_FILES) {
+    const moduleUrl = new URL(`${PYTHON_MODULE_DIR}/${moduleFile}`, import.meta.url);
+    const response = await fetch(moduleUrl);
+    if (!response.ok) {
+      throw new Error(`Python 모듈을 불러오지 못했습니다: ${moduleFile}`);
+    }
+    const source = await response.text();
+    pyodide.FS.writeFile(`${workspaceDir}/${moduleFile}`, source);
+  }
+
+  pyodide.runPython(`
+import sys
+if "/workspace" not in sys.path:
+    sys.path.insert(0, "/workspace")
+`);
 }
 
 function loadImageElement(file) {
