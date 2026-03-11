@@ -8,5 +8,6 @@
 
 이 폴더는 그대로 새 저장소 루트에 올리도록 정리했습니다.
 
-- `main` 브랜치에 push하면 `.github/workflows/pages.yml`이 GitHub Pages를 배포합니다.
+- GitHub 저장소 `Settings > Pages` 에서 `Deploy from a branch`를 선택합니다.
+- 브랜치는 `main`, 폴더는 `/(root)`를 선택합니다.
 - 배포 URL 형식은 `https://<github-username>.github.io/heartopia-sketchbook-dot/` 입니다.
