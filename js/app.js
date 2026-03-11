@@ -53,6 +53,7 @@ const viewerState = {
   hoverRow: null,
   activeColorCode: null,
   activeColorCodes: [],
+  completedCells: new Set(),
 };
 
 const paletteState = {
@@ -1015,6 +1016,7 @@ function prepareGuideViewer(message) {
   viewerState.hoverRow = null;
   viewerState.activeColorCode = null;
   viewerState.activeColorCodes = [];
+  viewerState.completedCells = new Set();
   guideInteraction = null;
   clearGuideCanvas();
   updateSaveButtonState(false);
@@ -1044,6 +1046,7 @@ function loadGuideGrid(gridCodes, usedColors) {
   viewerState.rows = gridCodes.length;
   viewerState.columns = gridCodes[0]?.length ?? 0;
   viewerState.paletteByCode = new Map(usedColors.map((item) => [item.code, item]));
+  viewerState.completedCells = new Set();
   syncActivePaletteSelection(new Set(viewerState.paletteByCode.keys()));
   viewerState.hoverColumn = null;
   viewerState.hoverRow = null;
@@ -1116,6 +1119,7 @@ function handleGuidePointerDown(event) {
     startPointerY: event.clientY,
     startPanX: viewerState.panX,
     startPanY: viewerState.panY,
+    didDrag: false,
   };
 
   guideViewport.classList.add("is-dragging");
@@ -1128,9 +1132,19 @@ function handleGuidePointerMove(event) {
     return;
   }
 
-  viewerState.panX = guideInteraction.startPanX + (event.clientX - guideInteraction.startPointerX);
-  viewerState.panY = guideInteraction.startPanY + (event.clientY - guideInteraction.startPointerY);
-  clampGuidePan();
+  const deltaX = event.clientX - guideInteraction.startPointerX;
+  const deltaY = event.clientY - guideInteraction.startPointerY;
+
+  if (!guideInteraction.didDrag && Math.hypot(deltaX, deltaY) > 6) {
+    guideInteraction.didDrag = true;
+  }
+
+  if (guideInteraction.didDrag) {
+    viewerState.panX = guideInteraction.startPanX + deltaX;
+    viewerState.panY = guideInteraction.startPanY + deltaY;
+    clampGuidePan();
+  }
+
   updateHoveredCellFromClientPoint(event.clientX, event.clientY);
   drawGuideCanvas();
   updateViewerNote();
@@ -1142,9 +1156,14 @@ function handleGuidePointerEnd(event) {
     return;
   }
 
+  const wasDrag = guideInteraction.didDrag;
   guideViewport.classList.remove("is-dragging");
   guideViewport.releasePointerCapture?.(event.pointerId);
   guideInteraction = null;
+
+  if (event.type !== "pointercancel" && !wasDrag) {
+    toggleCompletedCellFromClientPoint(event.clientX, event.clientY);
+  }
 }
 
 function handleGuideHover(event) {
@@ -1292,21 +1311,25 @@ function drawGuideCanvas() {
       const x = viewerState.panX + (column * cellSize);
       const code = gridRow[column];
       const color = viewerState.paletteByCode.get(code);
+      const isCompleted = viewerState.completedCells.has(`${row}:${column}`);
       const isCurrentMatch = Boolean(activeColorCode) && code === activeColorCode;
       const isPreviousMatch = !isCurrentMatch && selectedCodeSet.has(code);
       const isMatch = !isFiltering || isCurrentMatch || isPreviousMatch;
-      guideContext.fillStyle = !isFiltering
+      const baseFill = !isFiltering
         ? color?.hex_value || "#ffffff"
         : isCurrentMatch
           ? color?.hex_value || "#ffffff"
           : isPreviousMatch
             ? mixHexColors(color?.hex_value || "#ffffff", "#f8f0e7", 0.86)
             : "rgba(248,240,231,.82)";
+      guideContext.fillStyle = isCompleted ? mixHexColors(baseFill, "#f8f0e7", 0.72) : baseFill;
       guideContext.fillRect(x, y, cellSize + 0.6, cellSize + 0.6);
 
       if (isMatch && cellSize >= 16) {
         guideContext.save();
-        if (isPreviousMatch) {
+        if (isCompleted) {
+          guideContext.globalAlpha = 0.28;
+        } else if (isPreviousMatch) {
           guideContext.globalAlpha = 0.24;
         }
         const fontSize = clamp(cellSize * (code.length >= 4 ? 0.34 : 0.46), 8, 28);
@@ -1319,6 +1342,18 @@ function drawGuideCanvas() {
         guideContext.fillStyle = labelColor;
         guideContext.strokeText(code, x + (cellSize / 2), y + (cellSize / 2));
         guideContext.fillText(code, x + (cellSize / 2), y + (cellSize / 2));
+        guideContext.restore();
+      }
+
+      if (isCompleted && isMatch && cellSize >= 10) {
+        guideContext.save();
+        guideContext.strokeStyle = "rgba(86, 69, 55, .34)";
+        guideContext.lineWidth = Math.max(1.5, cellSize * 0.08);
+        guideContext.beginPath();
+        guideContext.moveTo(x + (cellSize * 0.22), y + (cellSize * 0.54));
+        guideContext.lineTo(x + (cellSize * 0.42), y + (cellSize * 0.72));
+        guideContext.lineTo(x + (cellSize * 0.78), y + (cellSize * 0.3));
+        guideContext.stroke();
         guideContext.restore();
       }
     }
@@ -1364,9 +1399,9 @@ function drawHoveredCell(cellSize) {
   guideContext.restore();
 }
 
-function updateHoveredCellFromClientPoint(clientX, clientY) {
+function getCellFromClientPoint(clientX, clientY) {
   if (!guideViewport || !viewerState.rows || !viewerState.columns) {
-    return;
+    return null;
   }
 
   const rect = guideViewport.getBoundingClientRect();
@@ -1376,6 +1411,51 @@ function updateHoveredCellFromClientPoint(clientX, clientY) {
   const row = Math.floor((localY - viewerState.panY) / viewerState.scale);
 
   if (column < 0 || row < 0 || column >= viewerState.columns || row >= viewerState.rows) {
+    return null;
+  }
+
+  return { column, row };
+}
+
+function toggleCompletedCellFromClientPoint(clientX, clientY) {
+  if (!viewerState.rows || !viewerState.columns) {
+    return;
+  }
+
+  const activeColorCodes = getActivePaletteCodes();
+  if (activeColorCodes.length === 0) {
+    return;
+  }
+
+  const cell = getCellFromClientPoint(clientX, clientY);
+  if (!cell) {
+    return;
+  }
+
+  const code = viewerState.gridCodes[cell.row]?.[cell.column];
+  if (!code || !activeColorCodes.includes(code)) {
+    return;
+  }
+
+  const key = `${cell.row}:${cell.column}`;
+  if (viewerState.completedCells.has(key)) {
+    viewerState.completedCells.delete(key);
+  } else {
+    viewerState.completedCells.add(key);
+  }
+
+  drawGuideCanvas();
+  updateViewerNote();
+  updateViewerDetail();
+}
+
+function updateHoveredCellFromClientPoint(clientX, clientY) {
+  if (!viewerState.rows || !viewerState.columns) {
+    return;
+  }
+
+  const cell = getCellFromClientPoint(clientX, clientY);
+  if (!cell) {
     if (viewerState.hoverColumn !== null || viewerState.hoverRow !== null) {
       viewerState.hoverColumn = null;
       viewerState.hoverRow = null;
@@ -1385,6 +1465,7 @@ function updateHoveredCellFromClientPoint(clientX, clientY) {
     return;
   }
 
+  const { column, row } = cell;
   if (viewerState.hoverColumn === column && viewerState.hoverRow === row) {
     return;
   }
@@ -1402,13 +1483,13 @@ function updateViewerNote() {
 
   const activeColorCodes = getActivePaletteCodes();
   if (activeColorCodes.length > 1 && viewerState.activeColorCode) {
-    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요. ${activeColorCodes.length}색 표시 중 · 현재 ${viewerState.activeColorCode}`;
+    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요. ${activeColorCodes.length}색 표시 중 · 현재 ${viewerState.activeColorCode} · 표시된 칸은 클릭해서 흐리게 체크할 수 있습니다.`;
     return;
   }
 
   if (viewerState.activeColorCode) {
     const color = viewerState.paletteByCode.get(viewerState.activeColorCode);
-    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요. ${color?.code || viewerState.activeColorCode}만 보기`;
+    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요. ${color?.code || viewerState.activeColorCode}만 보기 · 표시된 칸은 클릭해서 흐리게 체크할 수 있습니다.`;
     return;
   }
 
