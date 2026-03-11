@@ -2043,7 +2043,24 @@ function mixHexColors(baseHex, overlayHex, overlayWeight = 0.5) {
 }
 
 function hexToRgb(hexValue) {
-  const clean = hexValue.replace("#", "");
+  if (typeof hexValue !== "string") {
+    return [255, 255, 255];
+  }
+
+  const normalized = hexValue.trim();
+  if (normalized.startsWith("rgb")) {
+    const matches = normalized.match(/\d+(?:\.\d+)?/g);
+    if (matches && matches.length >= 3) {
+      return matches.slice(0, 3).map((value) => Math.round(Number(value)));
+    }
+    return [255, 255, 255];
+  }
+
+  const clean = normalized.replace("#", "");
+  if (clean.length !== 6) {
+    return [255, 255, 255];
+  }
+
   return [0, 2, 4].map((index) => Number.parseInt(clean.slice(index, index + 2), 16));
 }
 
