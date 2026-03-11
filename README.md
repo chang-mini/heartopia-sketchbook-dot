@@ -2,7 +2,7 @@
 
 두근두근타운 스케치북 이미지를 업로드해서 도트 도안으로 바꿔주는 웹 도구입니다.
 
-![도트 생성 화면](./assets/dot-generator-screen.webp)
+![도트 생성 화면](./assets/readme-preview.png)
 
 ## 소개
 
