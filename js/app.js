@@ -63,6 +63,87 @@ const paletteState = {
   rememberedMultiColorCodes: [],
 };
 
+const PYODIDE_INDEX_URL = "https://cdn.jsdelivr.net/pyodide/v0.29.3/full/";
+const PYTHON_CONVERTER_SOURCE = String.raw`
+import json
+from collections import Counter
+from functools import lru_cache
+from PIL import Image, ImageOps
+
+RESAMPLING = getattr(Image, "Resampling", Image)
+
+def convert_dot_snapshot(payload_json):
+    payload = json.loads(payload_json)
+    palette = [
+        {
+            "code": item["code"],
+            "group": item["group"],
+            "hex_value": item["hex_value"],
+            "rgb": tuple(item["rgb"]),
+        }
+        for item in payload["palette"]
+    ]
+
+    @lru_cache(maxsize=65536)
+    def nearest_palette_color(red, green, blue):
+        return min(
+            palette,
+            key=lambda candidate: (
+                ((red - candidate["rgb"][0]) ** 2)
+                + ((green - candidate["rgb"][1]) ** 2)
+                + ((blue - candidate["rgb"][2]) ** 2)
+            ),
+        )
+
+    with Image.open(payload["path"]) as original:
+        corrected = ImageOps.exif_transpose(original)
+        image = corrected.convert("RGBA")
+        background = Image.new("RGBA", image.size, "white")
+        composed = Image.alpha_composite(background, image).convert("RGB")
+        fitted = ImageOps.fit(
+            composed,
+            (int(payload["width"]), int(payload["height"])),
+            method=RESAMPLING.LANCZOS,
+        )
+        source_pixels = list(fitted.getdata())
+
+    width = int(payload["width"])
+    height = int(payload["height"])
+    usage = Counter()
+    grid_codes = []
+
+    for row_index in range(height):
+        row_codes = []
+        start = row_index * width
+        for column_index in range(width):
+            red, green, blue = source_pixels[start + column_index]
+            color = nearest_palette_color(red, green, blue)
+            row_codes.append(color["code"])
+            usage[color["code"]] += 1
+        grid_codes.append(row_codes)
+
+    used_colors = [
+        {
+            "code": color["code"],
+            "group": color["group"],
+            "hex_value": color["hex_value"],
+            "count": usage[color["code"]],
+        }
+        for color in palette
+        if usage[color["code"]] > 0
+    ]
+
+    return json.dumps(
+        {
+            "width": width,
+            "height": height,
+            "used_colors": used_colors,
+            "grid_codes": grid_codes,
+        },
+        ensure_ascii=False,
+    )
+`;
+
 const GROUP_MAIN_COLORS = {
   Black: "#000000",
   Red: "#ea696d",
@@ -102,7 +183,7 @@ let cropInteraction = null;
 let guideInteraction = null;
 let currentResultSnapshot = null;
 let lastViewportLayoutMode = getViewportLayoutMode();
-const nearestColorCache = new Map();
+let pyodideReadyPromise = null;
 
 imageInput?.addEventListener("change", handleImageSelection);
 ratioInput?.addEventListener("change", handleRatioChange);
@@ -630,16 +711,16 @@ function buildCroppedFilename(filename, mimeType) {
 
 async function convertImageLocally({ file, originalName, ratio, precision }) {
   const preset = getPreset(ratio, precision);
+  const pyodide = await ensurePythonRuntime();
   await nextFrame();
-  setStatus("리사이즈 중", `${preset.width} x ${preset.height} 캔버스로 맞추는 중입니다.`, 22);
-  const fittedImageData = await prepareImageData(file, preset);
-
-  await nextFrame();
-  setStatus("색상 매핑 중", "125색 팔레트에 가장 가까운 색으로 정리하는 중입니다.", 54);
-  const mapped = await mapImageDataToPalette(fittedImageData, preset);
-
-  await nextFrame();
-  setStatus("정리 중", "팔레트 목록과 도안 칸 정보를 정리하는 중입니다.", 88);
+  setStatus("파이썬 처리 중", `${preset.width} x ${preset.height} 도안을 같은 로직으로 변환하는 중입니다.`, 32);
+  const mapped = await convertWithPythonRuntime(pyodide, {
+    file,
+    originalName,
+    ratio,
+    precision,
+    preset,
+  });
 
   return {
     job_id: `local-${Date.now()}`,
@@ -653,87 +734,65 @@ async function convertImageLocally({ file, originalName, ratio, precision }) {
     updated_at: new Date().toISOString(),
     width: preset.width,
     height: preset.height,
-    used_colors: mapped.usedColors,
-    grid_codes: mapped.gridCodes,
+    used_colors: mapped.used_colors,
+    grid_codes: mapped.grid_codes,
   };
 }
 
-async function prepareImageData(file, preset) {
-  const image = await loadImageElement(file);
-  const canvas = document.createElement("canvas");
-  canvas.width = preset.width;
-  canvas.height = preset.height;
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-  if (!context) {
-    throw new Error("이미지 처리용 캔버스를 만들지 못했습니다.");
+async function ensurePythonRuntime() {
+  if (pyodideReadyPromise) {
+    return pyodideReadyPromise;
   }
 
-  context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = "high";
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  // Match the server version by flattening transparency onto white first.
-  context.fillStyle = "#ffffff";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.drawImage(image, 0, 0, canvas.width, canvas.height);
-  return context.getImageData(0, 0, canvas.width, canvas.height);
+  pyodideReadyPromise = (async () => {
+    if (typeof globalThis.loadPyodide !== "function") {
+      throw new Error("Pyodide 런타임을 불러오지 못했습니다.");
+    }
+
+    setStatus("런타임 준비 중", "Python 엔진을 불러오는 중입니다.", 6);
+    const pyodide = await globalThis.loadPyodide({ indexURL: PYODIDE_INDEX_URL });
+    setStatus("런타임 준비 중", "Pillow 패키지를 불러오는 중입니다.", 12);
+    await pyodide.loadPackage("pillow");
+    pyodide.runPython(PYTHON_CONVERTER_SOURCE);
+    return pyodide;
+  })();
+
+  return pyodideReadyPromise;
 }
 
-async function mapImageDataToPalette(imageData, preset) {
-  const { width, height, data } = imageData;
-  const gridCodes = Array.from({ length: height }, () => Array(width));
-  const usage = new Map();
+async function convertWithPythonRuntime(pyodide, { file, originalName, ratio, precision, preset }) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const safeName = buildPythonSafeFilename(file.name || originalName || "upload.png");
+  const inputPath = `/tmp/${Date.now()}-${safeName}`;
+  pyodide.FS.writeFile(inputPath, bytes);
 
-  for (let row = 0; row < height; row += 1) {
-    for (let column = 0; column < width; column += 1) {
-      const offset = ((row * width) + column) * 4;
-      const color = findNearestPaletteColor(data[offset], data[offset + 1], data[offset + 2]);
-      gridCodes[row][column] = color.code;
-      usage.set(color.code, (usage.get(color.code) || 0) + 1);
-    }
+  try {
+    const payload = JSON.stringify({
+      path: inputPath,
+      filename: originalName,
+      ratio,
+      precision,
+      width: preset.width,
+      height: preset.height,
+      palette: PALETTE,
+    });
 
-    if (row % 8 === 0 || row === height - 1) {
-      const progress = 54 + Math.round(((row + 1) / Math.max(height, 1)) * 28);
-      setStatus("색상 매핑 중", `${row + 1} / ${height} 줄을 처리했습니다.`, progress);
-      await nextFrame();
+    pyodide.globals.set("conversion_payload_json", payload);
+    const resultJson = await pyodide.runPythonAsync("convert_dot_snapshot(conversion_payload_json)");
+    pyodide.globals.delete("conversion_payload_json");
+    await nextFrame();
+    setStatus("정리 중", "파이썬 변환 결과를 화면에 적용하는 중입니다.", 90);
+    return JSON.parse(resultJson);
+  } finally {
+    try {
+      pyodide.FS.unlink(inputPath);
+    } catch {
     }
   }
-
-  const usedColors = PALETTE
-    .filter((item) => usage.has(item.code))
-    .sort((left, right) => PALETTE_ORDER[left.code] - PALETTE_ORDER[right.code])
-    .map((item) => ({
-      code: item.code,
-      group: item.group,
-      hex_value: item.hex_value,
-      count: usage.get(item.code) || 0,
-    }));
-
-  return { gridCodes, usedColors, width: preset.width, height: preset.height };
 }
 
-function findNearestPaletteColor(red, green, blue) {
-  const key = `${red},${green},${blue}`;
-  const cached = nearestColorCache.get(key);
-  if (cached) {
-    return cached;
-  }
-
-  let bestColor = PALETTE[0];
-  let bestDistance = Number.POSITIVE_INFINITY;
-
-  for (const candidate of PALETTE) {
-    const dr = red - candidate.rgb[0];
-    const dg = green - candidate.rgb[1];
-    const db = blue - candidate.rgb[2];
-    const distance = (dr * dr) + (dg * dg) + (db * db);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      bestColor = candidate;
-    }
-  }
-
-  nearestColorCache.set(key, bestColor);
-  return bestColor;
+function buildPythonSafeFilename(filename) {
+  return filename.replace(/[^A-Za-z0-9._-]/g, "_");
 }
 
 function loadImageElement(file) {
