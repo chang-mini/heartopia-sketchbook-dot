@@ -34,7 +34,6 @@ const paletteFamilyTrack = document.getElementById("palette-family-track");
 const palettePrevButton = document.getElementById("palette-prev");
 const paletteNextButton = document.getElementById("palette-next");
 const paletteMultiToggleButton = document.getElementById("palette-multi-toggle");
-const paletteResetButton = document.getElementById("palette-reset");
 const paletteCompleteButton = document.getElementById("palette-complete");
 const paletteFilterNote = document.getElementById("palette-filter-note");
 const guideContext = guideCanvas?.getContext("2d");
@@ -136,7 +135,6 @@ zoomInButton?.addEventListener("click", () => zoomGuideAtViewportCenter(1.2));
 saveCurrentButton?.addEventListener("click", saveCurrentConversion);
 savedFileInput?.addEventListener("change", handleSavedFileSelection);
 paletteMultiToggleButton?.addEventListener("click", togglePaletteMultiSelect);
-paletteResetButton?.addEventListener("click", resetPaletteFilter);
 paletteCompleteButton?.addEventListener("click", completeActiveColorCells);
 palettePrevButton?.addEventListener("click", () => shiftPalettePage(-1));
 paletteNextButton?.addEventListener("click", () => shiftPalettePage(1));
@@ -1802,10 +1800,6 @@ function updatePaletteFilterUi() {
     paletteMultiToggleButton.title = paletteState.multiSelectEnabled
       ? "여러 상세 색을 함께 표시 중입니다."
       : "한 번에 한 상세 색만 표시합니다.";
-  }
-
-  if (paletteResetButton) {
-    paletteResetButton.hidden = activeCodeSet.size === 0;
   }
 
   if (paletteCompleteButton) {
