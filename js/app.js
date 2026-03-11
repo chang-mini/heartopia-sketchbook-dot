@@ -1345,7 +1345,7 @@ function drawGuideCanvas() {
         guideContext.restore();
       }
 
-      if (isCompleted && isMatch && cellSize >= 10) {
+      if (isCompleted && isCurrentMatch && cellSize >= 10) {
         guideContext.save();
         guideContext.strokeStyle = "rgba(86, 69, 55, .34)";
         guideContext.lineWidth = Math.max(1.5, cellSize * 0.08);
@@ -1482,14 +1482,15 @@ function updateViewerNote() {
   }
 
   const activeColorCodes = getActivePaletteCodes();
+  const activeColorProgress = getActiveColorProgressText();
   if (activeColorCodes.length > 1 && viewerState.activeColorCode) {
-    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요. ${activeColorCodes.length}색 표시 중 · 현재 ${viewerState.activeColorCode} · 표시된 칸은 클릭해서 흐리게 체크할 수 있습니다.`;
+    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요. ${activeColorCodes.length}색 표시 중 · 현재 ${viewerState.activeColorCode}${activeColorProgress} · 표시된 칸은 클릭해서 흐리게 체크할 수 있습니다.`;
     return;
   }
 
   if (viewerState.activeColorCode) {
     const color = viewerState.paletteByCode.get(viewerState.activeColorCode);
-    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요. ${color?.code || viewerState.activeColorCode}만 보기 · 표시된 칸은 클릭해서 흐리게 체크할 수 있습니다.`;
+    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요. ${color?.code || viewerState.activeColorCode}만 보기${activeColorProgress} · 표시된 칸은 클릭해서 흐리게 체크할 수 있습니다.`;
     return;
   }
 
@@ -1497,6 +1498,41 @@ function updateViewerNote() {
 }
 
 function updateViewerDetail() {
+}
+
+function getActiveColorProgressText() {
+  const activeCode = viewerState.activeColorCode;
+  if (!activeCode) {
+    return "";
+  }
+
+  const totalCount = Number(viewerState.paletteByCode.get(activeCode)?.count || 0);
+  const completedCount = countCompletedCellsForCode(activeCode);
+  const remainingCount = Math.max(0, totalCount - completedCount);
+
+  if (totalCount <= 0) {
+    return "";
+  }
+
+  return ` · ${totalCount}칸 중 ${remainingCount}칸 남음`;
+}
+
+function countCompletedCellsForCode(targetCode) {
+  if (!targetCode || viewerState.completedCells.size === 0) {
+    return 0;
+  }
+
+  let completedCount = 0;
+  viewerState.completedCells.forEach((key) => {
+    const [rowText, columnText] = key.split(":");
+    const row = Number(rowText);
+    const column = Number(columnText);
+    if (viewerState.gridCodes[row]?.[column] === targetCode) {
+      completedCount += 1;
+    }
+  });
+
+  return completedCount;
 }
 
 function togglePaletteMultiSelect() {
