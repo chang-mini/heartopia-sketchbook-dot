@@ -35,6 +35,7 @@ const palettePrevButton = document.getElementById("palette-prev");
 const paletteNextButton = document.getElementById("palette-next");
 const paletteMultiToggleButton = document.getElementById("palette-multi-toggle");
 const paletteCompleteButton = document.getElementById("palette-complete");
+const paletteModeIndicator = document.getElementById("palette-mode-indicator");
 const paletteFilterNote = document.getElementById("palette-filter-note");
 const guideContext = guideCanvas?.getContext("2d");
 
@@ -1798,9 +1799,15 @@ function updatePaletteFilterUi() {
   if (paletteMultiToggleButton) {
     paletteMultiToggleButton.classList.toggle("is-active", paletteState.multiSelectEnabled);
     paletteMultiToggleButton.setAttribute("aria-pressed", String(paletteState.multiSelectEnabled));
+    paletteMultiToggleButton.textContent = paletteState.multiSelectEnabled ? "전체 보기" : "여러 색 보기";
     paletteMultiToggleButton.title = paletteState.multiSelectEnabled
       ? "여러 상세 색을 함께 표시 중입니다."
       : "한 번에 한 상세 색만 표시합니다.";
+  }
+
+  if (paletteModeIndicator) {
+    paletteModeIndicator.textContent = paletteState.multiSelectEnabled ? "멀티모드" : "원본";
+    paletteModeIndicator.classList.toggle("is-multi", paletteState.multiSelectEnabled);
   }
 
   if (paletteCompleteButton) {
