@@ -776,7 +776,7 @@ async function saveCurrentConversion() {
   const filename = buildSavedFilename(currentResultSnapshot);
   const payload = {
     type: "duduta-dot-save",
-    version: 1,
+    version: 2,
     exported_at: new Date().toISOString(),
     snapshot: buildPortableSnapshot(currentResultSnapshot),
   };
@@ -824,7 +824,8 @@ function buildSavedFilename(snapshot) {
   return `${baseName}-${snapshot.ratio}-p${snapshot.precision}.dudot.json`;
 }
 
-function buildPortableSnapshot(snapshot) {
+function buildPortableSnapshot(snapshot, options = {}) {
+  const { preserveExistingUiState = false } = options;
   return {
     job_id: snapshot.job_id || `local-${Date.now()}`,
     filename: snapshot.filename || "saved-dot-guide",
@@ -839,7 +840,42 @@ function buildPortableSnapshot(snapshot) {
     height: snapshot.height,
     used_colors: Array.isArray(snapshot.used_colors) ? snapshot.used_colors : [],
     grid_codes: Array.isArray(snapshot.grid_codes) ? snapshot.grid_codes : [],
+    ui_state: preserveExistingUiState
+      ? buildPortableUiState(snapshot.ui_state)
+      : buildPortableUiState(),
   };
+}
+
+function buildPortableUiState(existingUiState) {
+  if (existingUiState && typeof existingUiState === "object") {
+    return {
+      completed_cells: sanitizeCompletedCells(existingUiState.completed_cells),
+      multi_select_enabled: Boolean(existingUiState.multi_select_enabled),
+      active_color_code: typeof existingUiState.active_color_code === "string" ? existingUiState.active_color_code : null,
+      active_color_codes: Array.isArray(existingUiState.active_color_codes)
+        ? existingUiState.active_color_codes.filter((code) => typeof code === "string")
+        : [],
+      remembered_multi_color_codes: Array.isArray(existingUiState.remembered_multi_color_codes)
+        ? existingUiState.remembered_multi_color_codes.filter((code) => typeof code === "string")
+        : [],
+    };
+  }
+
+  return {
+    completed_cells: [...viewerState.completedCells],
+    multi_select_enabled: paletteState.multiSelectEnabled,
+    active_color_code: viewerState.activeColorCode,
+    active_color_codes: [...getActivePaletteCodes()],
+    remembered_multi_color_codes: [...paletteState.rememberedMultiColorCodes],
+  };
+}
+
+function sanitizeCompletedCells(entries) {
+  if (!Array.isArray(entries)) {
+    return [];
+  }
+
+  return entries.filter((entry) => typeof entry === "string" && /^\d+:\d+$/.test(entry));
 }
 
 function extractPortableSnapshot(payload) {
@@ -873,15 +909,61 @@ function applyImportedConversion(snapshot, sourceName) {
   }
 
   stopTracking();
-  currentResultSnapshot = buildPortableSnapshot(snapshot);
+  currentResultSnapshot = buildPortableSnapshot(snapshot, { preserveExistingUiState: true });
   submitButton.disabled = false;
   setStatus("저장본 불러옴", `"${sourceName}" 파일을 불러왔습니다.`, 100);
   renderCompleted(currentResultSnapshot);
+  restoreImportedUiState(currentResultSnapshot.ui_state);
   updateSaveButtonState(true);
   if (savedStatus) {
     savedStatus.hidden = true;
     savedStatus.textContent = "";
   }
+}
+
+function restoreImportedUiState(uiState) {
+  if (!uiState || typeof uiState !== "object") {
+    return;
+  }
+
+  const validCodes = new Set(viewerState.paletteByCode.keys());
+  const activeCodes = Array.isArray(uiState.active_color_codes)
+    ? uiState.active_color_codes.filter((code) => validCodes.has(code))
+    : [];
+  const rememberedCodes = Array.isArray(uiState.remembered_multi_color_codes)
+    ? uiState.remembered_multi_color_codes.filter((code) => validCodes.has(code))
+    : [];
+  const activeCode = typeof uiState.active_color_code === "string" && validCodes.has(uiState.active_color_code)
+    ? uiState.active_color_code
+    : activeCodes[activeCodes.length - 1] || null;
+
+  viewerState.completedCells = new Set(
+    sanitizeCompletedCells(uiState.completed_cells).filter((entry) => {
+      const [rowText, columnText] = entry.split(":");
+      const row = Number(rowText);
+      const column = Number(columnText);
+      return row >= 0
+        && column >= 0
+        && row < viewerState.rows
+        && column < viewerState.columns;
+    }),
+  );
+  paletteState.multiSelectEnabled = Boolean(uiState.multi_select_enabled);
+  viewerState.activeColorCodes = activeCodes;
+  viewerState.activeColorCode = activeCode;
+  paletteState.rememberedMultiColorCodes = rememberedCodes;
+
+  if (viewerState.activeColorCode) {
+    paletteState.activeGroup = getPaletteGroupNameByCode(viewerState.activeColorCode);
+  }
+
+  ensurePalettePageForActiveGroup();
+  renderPaletteGroups();
+  renderPaletteDetails();
+  updatePaletteFilterUi();
+  drawGuideCanvas();
+  updateViewerNote();
+  updateViewerDetail();
 }
 
 function triggerFileDownload(blob, filename) {
