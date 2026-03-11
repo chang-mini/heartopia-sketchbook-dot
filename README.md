@@ -27,6 +27,7 @@
 ## 후원
 
 - [GitHub Sponsors로 후원하기](https://github.com/sponsors/chang-mini)
+- [커피한잔의 여유](https://open.kakao.com/o/susNoXfg)
 - 이 도구가 계속 업데이트될 수 있도록 후원으로 응원할 수 있습니다.
 
 ## 기술 메모
