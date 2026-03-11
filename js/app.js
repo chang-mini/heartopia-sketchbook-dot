@@ -1073,7 +1073,7 @@ function renderError(message) {
   renderPalette([]);
 }
 
-function resetResultArea(message = "도안 생성 후 여기서 바로 확대하고 이동할 수 있습니다.") {
+function resetResultArea(message = "첫 실행은 Python 엔진과 Pillow를 브라우저에 불러오느라 조금 느릴 수 있습니다.") {
   prepareGuideViewer(message);
   renderPalette([]);
 }
