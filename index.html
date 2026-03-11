@@ -1013,6 +1013,7 @@
 
     .palette-blob {
       position: relative;
+      z-index: 1;
       width: 62px;
       height: 50px;
       border-radius: 24px 26px 20px 28px;
@@ -1044,6 +1045,8 @@
     }
 
     .palette-meta {
+      position: relative;
+      z-index: 2;
       display: grid;
       gap: 2px;
       width: 100%;
@@ -1063,6 +1066,7 @@
 
     .palette-chip-order {
       position: absolute;
+      z-index: 3;
       top: 10px;
       right: 10px;
       display: inline-flex;
@@ -1082,6 +1086,7 @@
 
     .palette-chip-complete {
       position: absolute;
+      z-index: 3;
       top: 10px;
       left: 10px;
       display: none;

@@ -1529,6 +1529,8 @@ function toggleCompletedCellFromClientPoint(clientX, clientY) {
   }
 
   drawGuideCanvas();
+  renderPaletteDetails();
+  updatePaletteFilterUi();
   updateViewerNote();
   updateViewerDetail();
 }
@@ -1639,6 +1641,7 @@ function completeActiveColorCells() {
     return;
   }
 
+  const shouldComplete = !isCodeCompleted(activeCode);
   let changed = false;
   for (let row = 0; row < viewerState.rows; row += 1) {
     const gridRow = viewerState.gridCodes[row];
@@ -1647,8 +1650,11 @@ function completeActiveColorCells() {
         continue;
       }
       const key = `${row}:${column}`;
-      if (!viewerState.completedCells.has(key)) {
+      if (shouldComplete && !viewerState.completedCells.has(key)) {
         viewerState.completedCells.add(key);
+        changed = true;
+      } else if (!shouldComplete && viewerState.completedCells.has(key)) {
+        viewerState.completedCells.delete(key);
         changed = true;
       }
     }
@@ -1803,10 +1809,12 @@ function updatePaletteFilterUi() {
   }
 
   if (paletteCompleteButton) {
-    const canComplete = Boolean(viewerState.rows && viewerState.columns && activeCode && getRemainingCountForCode(activeCode) > 0);
+    const canComplete = Boolean(viewerState.rows && viewerState.columns && activeCode);
     paletteCompleteButton.hidden = !activeCode;
     paletteCompleteButton.disabled = !canComplete;
-    paletteCompleteButton.textContent = activeCode ? `${activeCode} 완료` : "완료";
+    paletteCompleteButton.textContent = activeCode
+      ? `${activeCode} ${isCodeCompleted(activeCode) ? "완료 해제" : "완료"}`
+      : "완료";
   }
 
   if (palettePrevButton) {
