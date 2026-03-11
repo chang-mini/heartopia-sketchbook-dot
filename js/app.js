@@ -671,6 +671,9 @@ async function prepareImageData(file, preset) {
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
   context.clearRect(0, 0, canvas.width, canvas.height);
+  // Match the server version by flattening transparency onto white first.
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
   return context.getImageData(0, 0, canvas.width, canvas.height);
 }
