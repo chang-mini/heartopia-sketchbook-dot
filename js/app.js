@@ -1,4 +1,4 @@
-import { getPreset } from "./config.js";
+import { PALETTE, getPreset } from "./config.js";
 
 const form = document.getElementById("conversion-form");
 const imageInput = document.getElementById("image");
@@ -98,6 +98,11 @@ const GROUP_DISPLAY_ORDER = [
   "Magenta",
   "Pink",
 ];
+
+const DEFAULT_PALETTE_ITEMS = PALETTE.map((item) => ({
+  ...item,
+  count: 0,
+}));
 
 let selectedFile = null;
 let sourceImageUrl = null;
@@ -948,32 +953,16 @@ function renderPalette(items) {
     return;
   }
 
+  const paletteItems = Array.isArray(items) && items.length > 0
+    ? items
+    : DEFAULT_PALETTE_ITEMS;
+
   if (!Array.isArray(items) || items.length === 0) {
     viewerState.activeColorCode = null;
     viewerState.activeColorCodes = [];
-    paletteState.groups = [];
     paletteState.page = 0;
     paletteState.activeGroup = null;
     paletteState.rememberedMultiColorCodes = [];
-    if (paletteSidebar) {
-      paletteSidebar.hidden = true;
-    }
-    mainShell?.classList.remove("has-palette-sidebar");
-    palette.innerHTML = "";
-    paletteFamilyTrack.innerHTML = "";
-    if (paletteFilterNote) {
-      paletteFilterNote.textContent = "";
-    }
-    if (paletteResetButton) {
-      paletteResetButton.hidden = true;
-    }
-    if (palettePrevButton) {
-      palettePrevButton.disabled = true;
-    }
-    if (paletteNextButton) {
-      paletteNextButton.disabled = true;
-    }
-    return;
   }
 
   if (paletteSidebar) {
@@ -981,8 +970,8 @@ function renderPalette(items) {
   }
   mainShell?.classList.add("has-palette-sidebar");
 
-  paletteState.groups = buildPaletteGroups(items);
-  syncActivePaletteSelection(new Set(items.map((item) => item.code)));
+  paletteState.groups = buildPaletteGroups(paletteItems);
+  syncActivePaletteSelection(new Set(paletteItems.map((item) => item.code)));
   if (!paletteState.groups.some((group) => group.name === paletteState.activeGroup)) {
     paletteState.activeGroup = getPaletteGroupNameByCode(viewerState.activeColorCode) || paletteState.groups[0]?.name || null;
   }
@@ -998,6 +987,7 @@ function renderError(message) {
     statusPill.title = message;
   }
   prepareGuideViewer(message);
+  renderPalette([]);
 }
 
 function resetResultArea(message = "도안 생성 후 여기서 바로 확대하고 이동할 수 있습니다.") {
@@ -1025,14 +1015,6 @@ function prepareGuideViewer(message) {
   viewerState.hoverRow = null;
   viewerState.activeColorCode = null;
   viewerState.activeColorCodes = [];
-  paletteState.groups = [];
-  paletteState.page = 0;
-  paletteState.activeGroup = null;
-  paletteState.rememberedMultiColorCodes = [];
-  if (paletteSidebar) {
-    paletteSidebar.hidden = true;
-  }
-  mainShell?.classList.remove("has-palette-sidebar");
   guideInteraction = null;
   clearGuideCanvas();
   updateSaveButtonState(false);
@@ -1582,6 +1564,10 @@ function updatePaletteFilterUi() {
   }
 
   if (!paletteFilterNote) {
+    return;
+  }
+  if (!viewerState.rows || !viewerState.columns) {
+    paletteFilterNote.textContent = "도안을 생성하면 사용 색상 기준으로 자동 정리됩니다.";
     return;
   }
   paletteFilterNote.textContent = "";
