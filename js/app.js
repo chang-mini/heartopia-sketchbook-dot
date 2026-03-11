@@ -18,7 +18,6 @@ const viewerNote = document.getElementById("viewer-note");
 const saveCurrentButton = document.getElementById("save-current");
 const savedFileInput = document.getElementById("saved-file");
 const savedStatus = document.getElementById("saved-status");
-const runtimeHint = document.getElementById("runtime-hint");
 const guideViewport = document.getElementById("guide-viewport");
 const guideCanvas = document.getElementById("guide-canvas");
 const guideEmpty = document.getElementById("guide-empty");
@@ -679,9 +678,6 @@ async function ensurePythonRuntime() {
     await pyodide.loadPackage("pillow");
     await syncPythonModules(pyodide);
     pyodide.runPython("from converter import convert_dot_snapshot");
-    if (runtimeHint) {
-      runtimeHint.textContent = "런타임 준비 완료. 이후 변환은 더 빠르게 시작됩니다.";
-    }
     return pyodide;
   })();
 
