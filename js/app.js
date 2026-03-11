@@ -15,7 +15,6 @@ const cropMeta = document.getElementById("crop-meta");
 const statusPill = document.getElementById("status-pill");
 const progressBar = document.getElementById("progress-bar");
 const viewerNote = document.getElementById("viewer-note");
-const overlayToggleButton = document.getElementById("overlay-toggle");
 const saveCurrentButton = document.getElementById("save-current");
 const savedFileInput = document.getElementById("saved-file");
 const savedStatus = document.getElementById("saved-status");
@@ -38,7 +37,6 @@ const paletteNextButton = document.getElementById("palette-next");
 const paletteMultiToggleButton = document.getElementById("palette-multi-toggle");
 const paletteResetButton = document.getElementById("palette-reset");
 const paletteFilterNote = document.getElementById("palette-filter-note");
-const viewerOverlayBackdrop = document.getElementById("viewer-overlay-backdrop");
 const guideContext = guideCanvas?.getContext("2d");
 
 const viewerState = {
@@ -130,7 +128,6 @@ zoomOutButton?.addEventListener("click", () => zoomGuideAtViewportCenter(1 / 1.2
 zoomResetButton?.addEventListener("click", () => fitGuideToViewport(true));
 zoomInButton?.addEventListener("click", () => zoomGuideAtViewportCenter(1.2));
 saveCurrentButton?.addEventListener("click", saveCurrentConversion);
-overlayToggleButton?.addEventListener("click", () => toggleViewerOverlay());
 savedFileInput?.addEventListener("change", handleSavedFileSelection);
 paletteMultiToggleButton?.addEventListener("click", togglePaletteMultiSelect);
 paletteResetButton?.addEventListener("click", resetPaletteFilter);
@@ -144,8 +141,6 @@ window.addEventListener("pointerup", handleGuidePointerEnd);
 window.addEventListener("pointercancel", handleGuidePointerEnd);
 window.addEventListener("resize", handleWindowResize);
 window.addEventListener("beforeunload", releaseSourceImage);
-window.addEventListener("keydown", handleOverlayKeydown);
-viewerOverlayBackdrop?.addEventListener("click", () => toggleViewerOverlay(false));
 
 renderSelectedFile();
 renderCropSelection();
@@ -1018,7 +1013,6 @@ function prepareGuideViewer(message) {
   setGuideMessage(message);
   guideEmpty.hidden = false;
   guideViewport?.classList.remove("is-ready", "is-dragging");
-  toggleViewerOverlay(false);
   setGuideControlsEnabled(false);
   currentResultSnapshot = null;
   viewerState.gridCodes = [];
@@ -1065,44 +1059,6 @@ function updateSaveButtonState(enabled) {
   }
   saveCurrentButton.disabled = !enabled;
   saveCurrentButton.textContent = "저장";
-  if (overlayToggleButton) {
-    overlayToggleButton.disabled = !enabled;
-    overlayToggleButton.textContent = isViewerOverlayOpen() ? "오버레이 닫기" : "오버레이";
-  }
-}
-
-function isViewerOverlayOpen() {
-  return document.body.classList.contains("viewer-overlay-open");
-}
-
-function toggleViewerOverlay(force) {
-  if (!overlayToggleButton) {
-    return;
-  }
-
-  if (typeof force !== "boolean" && overlayToggleButton.disabled) {
-    return;
-  }
-
-  const nextOpen = typeof force === "boolean" ? force : !isViewerOverlayOpen();
-  document.body.classList.toggle("viewer-overlay-open", nextOpen);
-  if (viewerOverlayBackdrop) {
-    viewerOverlayBackdrop.hidden = !nextOpen;
-  }
-  overlayToggleButton.classList.toggle("is-active", nextOpen);
-  overlayToggleButton.textContent = nextOpen ? "오버레이 닫기" : "오버레이";
-
-  if (nextOpen && viewerState.rows && viewerState.columns) {
-    window.requestAnimationFrame(() => {
-      fitGuideToViewport(true);
-    });
-  }
-}
-
-function handleOverlayKeydown(event) {
-  if (event.key === "Escape" && isViewerOverlayOpen()) {
-    toggleViewerOverlay(false);
-  }
 }
 
 function loadGuideGrid(gridCodes, usedColors) {
@@ -1870,7 +1826,6 @@ function handleWindowResize() {
   const nextViewportLayoutMode = getViewportLayoutMode();
   const layoutModeChanged = nextViewportLayoutMode !== lastViewportLayoutMode;
   lastViewportLayoutMode = nextViewportLayoutMode;
-  const overlayOpen = isViewerOverlayOpen();
 
   if (cropSelection) {
     renderCropSelection();
@@ -1878,7 +1833,7 @@ function handleWindowResize() {
   if (viewerState.rows && viewerState.columns) {
     if (layoutModeChanged) {
       fitGuideToViewport(true);
-      if (nextViewportLayoutMode === "desktop" && !overlayOpen) {
+      if (nextViewportLayoutMode === "desktop") {
         window.requestAnimationFrame(() => {
           window.scrollTo(0, 0);
           viewerShell?.scrollIntoView({ block: "start" });
