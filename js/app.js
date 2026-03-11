@@ -35,6 +35,7 @@ const palettePrevButton = document.getElementById("palette-prev");
 const paletteNextButton = document.getElementById("palette-next");
 const paletteMultiToggleButton = document.getElementById("palette-multi-toggle");
 const paletteResetButton = document.getElementById("palette-reset");
+const paletteCompleteButton = document.getElementById("palette-complete");
 const paletteFilterNote = document.getElementById("palette-filter-note");
 const guideContext = guideCanvas?.getContext("2d");
 
@@ -136,6 +137,7 @@ saveCurrentButton?.addEventListener("click", saveCurrentConversion);
 savedFileInput?.addEventListener("change", handleSavedFileSelection);
 paletteMultiToggleButton?.addEventListener("click", togglePaletteMultiSelect);
 paletteResetButton?.addEventListener("click", resetPaletteFilter);
+paletteCompleteButton?.addEventListener("click", completeActiveColorCells);
 palettePrevButton?.addEventListener("click", () => shiftPalettePage(-1));
 paletteNextButton?.addEventListener("click", () => shiftPalettePage(1));
 window.addEventListener("pointermove", handleCropPointerMove);
@@ -1589,9 +1591,8 @@ function getActiveColorProgressText() {
     return "";
   }
 
-  const totalCount = Number(viewerState.paletteByCode.get(activeCode)?.count || 0);
-  const completedCount = countCompletedCellsForCode(activeCode);
-  const remainingCount = Math.max(0, totalCount - completedCount);
+  const totalCount = getTotalCountForCode(activeCode);
+  const remainingCount = getRemainingCountForCode(activeCode);
 
   if (totalCount <= 0) {
     return "";
@@ -1616,6 +1617,52 @@ function countCompletedCellsForCode(targetCode) {
   });
 
   return completedCount;
+}
+
+function getTotalCountForCode(targetCode) {
+  return Number(viewerState.paletteByCode.get(targetCode)?.count || 0);
+}
+
+function getRemainingCountForCode(targetCode) {
+  const totalCount = getTotalCountForCode(targetCode);
+  return Math.max(0, totalCount - countCompletedCellsForCode(targetCode));
+}
+
+function isCodeCompleted(targetCode) {
+  const totalCount = getTotalCountForCode(targetCode);
+  return totalCount > 0 && getRemainingCountForCode(targetCode) === 0;
+}
+
+function completeActiveColorCells() {
+  const activeCode = viewerState.activeColorCode;
+  if (!activeCode || !viewerState.rows || !viewerState.columns) {
+    return;
+  }
+
+  let changed = false;
+  for (let row = 0; row < viewerState.rows; row += 1) {
+    const gridRow = viewerState.gridCodes[row];
+    for (let column = 0; column < viewerState.columns; column += 1) {
+      if (gridRow[column] !== activeCode) {
+        continue;
+      }
+      const key = `${row}:${column}`;
+      if (!viewerState.completedCells.has(key)) {
+        viewerState.completedCells.add(key);
+        changed = true;
+      }
+    }
+  }
+
+  if (!changed) {
+    return;
+  }
+
+  drawGuideCanvas();
+  renderPaletteDetails();
+  updatePaletteFilterUi();
+  updateViewerNote();
+  updateViewerDetail();
 }
 
 function togglePaletteMultiSelect() {
@@ -1753,6 +1800,13 @@ function updatePaletteFilterUi() {
 
   if (paletteResetButton) {
     paletteResetButton.hidden = activeCodeSet.size === 0;
+  }
+
+  if (paletteCompleteButton) {
+    const canComplete = Boolean(viewerState.rows && viewerState.columns && activeCode && getRemainingCountForCode(activeCode) > 0);
+    paletteCompleteButton.hidden = !activeCode;
+    paletteCompleteButton.disabled = !canComplete;
+    paletteCompleteButton.textContent = activeCode ? `${activeCode} 완료` : "완료";
   }
 
   if (palettePrevButton) {
@@ -1952,10 +2006,12 @@ function renderPaletteDetails() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "palette-chip";
+    button.classList.toggle("is-complete", isCodeCompleted(item.code));
     button.dataset.code = item.code;
     button.title = `${item.code} ${item.group} ${item.count}칸`;
     button.style.setProperty("--swatch", item.hex_value);
     button.innerHTML = `
+      <span class="palette-chip-complete" aria-hidden="true">✓</span>
       <span class="palette-chip-order" aria-hidden="true"></span>
       <span class="palette-blob" aria-hidden="true"></span>
       <span class="palette-meta">

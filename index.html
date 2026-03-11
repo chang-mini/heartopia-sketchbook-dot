@@ -781,7 +781,8 @@
     }
 
     .palette-action-button,
-    .palette-reset {
+    .palette-reset,
+    .palette-complete {
       width: auto;
       min-height: 42px;
       padding: 10px 14px;
@@ -797,6 +798,17 @@
 
     .palette-filter-note {
       min-height: 22px;
+    }
+
+    .palette-complete {
+      border-color: rgba(64, 148, 97, .26);
+      background: linear-gradient(180deg, rgba(239, 251, 244, .96), rgba(223, 244, 231, .94));
+      color: #22613f;
+    }
+
+    .palette-complete:hover:not(:disabled) {
+      border-color: rgba(64, 148, 97, .38);
+      box-shadow: 0 12px 20px rgba(42, 115, 71, .12);
     }
 
     .palette-support {
@@ -992,6 +1004,13 @@
       opacity: .34;
     }
 
+    .palette-chip.is-complete {
+      border-color: rgba(73, 153, 101, .28);
+      box-shadow:
+        0 0 0 3px rgba(73, 153, 101, .1),
+        0 16px 28px rgba(59, 118, 79, .1);
+    }
+
     .palette-blob {
       position: relative;
       width: 62px;
@@ -1059,6 +1078,27 @@
       color: #7a4a2e;
       background: rgba(255, 255, 255, .92);
       box-shadow: 0 8px 14px rgba(77, 54, 35, .12);
+    }
+
+    .palette-chip-complete {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #62c37d, #3ea661);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 900;
+      box-shadow: 0 10px 18px rgba(46, 122, 73, .22);
+    }
+
+    .palette-chip.is-complete .palette-chip-complete {
+      display: inline-flex;
     }
 
     .palette-chip.is-active-previous .palette-chip-order {
@@ -1385,6 +1425,7 @@
             <button class="ghost-button palette-action-button palette-multi-toggle" id="palette-multi-toggle"
               type="button">여러 색 보기</button>
             <button class="ghost-button palette-reset" id="palette-reset" type="button" hidden>전체 보기</button>
+            <button class="ghost-button palette-complete" id="palette-complete" type="button" hidden>완료</button>
           </div>
         </div>
         <div class="palette-preview" id="palette-preview">
