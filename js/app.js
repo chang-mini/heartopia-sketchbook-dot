@@ -1398,7 +1398,7 @@ function drawGuideCanvas() {
       const isCurrentMatch = Boolean(activeColorCode) && code === activeColorCode;
       const isPreviousMatch = !isCurrentMatch && selectedCodeSet.has(code);
       const isMatch = !isFiltering || isCurrentMatch || isPreviousMatch;
-      const showCompletedFade = isFiltering && isCompleted;
+      const showCompletedFade = isCompleted && (!isFiltering || isCurrentMatch);
       const baseFill = !isFiltering
         ? color?.hex_value || "#ffffff"
         : isCurrentMatch
