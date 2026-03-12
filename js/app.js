@@ -130,6 +130,7 @@ guideViewport?.addEventListener("wheel", handleGuideWheel, { passive: false });
 guideViewport?.addEventListener("pointerdown", handleGuidePointerDown);
 guideViewport?.addEventListener("pointermove", handleGuideHover);
 guideViewport?.addEventListener("pointerleave", clearGuideHover);
+guideViewport?.addEventListener("auxclick", preventDefault);
 zoomOutButton?.addEventListener("click", () => zoomGuideAtViewportCenter(1 / 1.2));
 zoomResetButton?.addEventListener("click", () => fitGuideToViewport(true));
 zoomInButton?.addEventListener("click", () => zoomGuideAtViewportCenter(1.2));
@@ -1192,26 +1193,52 @@ function handleGuidePointerDown(event) {
   if (!viewerState.rows || !viewerState.columns) {
     return;
   }
-  if (event.pointerType !== "touch" && event.button !== 0) {
+  if (event.pointerType !== "touch" && event.button !== 0 && event.button !== 1) {
     return;
   }
 
+  const mode = event.pointerType !== "touch" && event.button === 1 ? "paint" : "pan";
+  const initialCell = mode === "paint" ? getCellFromClientPoint(event.clientX, event.clientY) : null;
+  const paintCompleted = mode === "paint" ? !isCellCompleted(initialCell) : null;
+
   guideInteraction = {
     pointerId: event.pointerId,
+    mode,
+    paintCompleted,
     startPointerX: event.clientX,
     startPointerY: event.clientY,
     startPanX: viewerState.panX,
     startPanY: viewerState.panY,
     didDrag: false,
+    lastPaintedKey: getCellKey(initialCell),
   };
 
-  guideViewport.classList.add("is-dragging");
+  if (mode === "pan") {
+    guideViewport.classList.add("is-dragging");
+  } else if (setCompletedStateForCell(initialCell, paintCompleted)) {
+    syncCompletedCellUi();
+  }
   guideViewport.setPointerCapture?.(event.pointerId);
   event.preventDefault();
 }
 
 function handleGuidePointerMove(event) {
   if (!guideInteraction || event.pointerId !== guideInteraction.pointerId) {
+    return;
+  }
+
+  if (guideInteraction.mode === "paint") {
+    const cell = getCellFromClientPoint(event.clientX, event.clientY);
+    const cellKey = getCellKey(cell);
+    if (cellKey !== guideInteraction.lastPaintedKey) {
+      guideInteraction.lastPaintedKey = cellKey;
+      if (setCompletedStateForCell(cell, guideInteraction.paintCompleted)) {
+        syncCompletedCellUi();
+      }
+    }
+
+    updateHoveredCellFromClientPoint(event.clientX, event.clientY);
+    event.preventDefault();
     return;
   }
 
@@ -1240,11 +1267,25 @@ function handleGuidePointerEnd(event) {
   }
 
   const wasDrag = guideInteraction.didDrag;
+  const mode = guideInteraction.mode;
+  const paintCompleted = guideInteraction.paintCompleted;
   guideViewport.classList.remove("is-dragging");
   guideViewport.releasePointerCapture?.(event.pointerId);
   guideInteraction = null;
 
-  if (event.type !== "pointercancel" && !wasDrag) {
+  if (event.type === "pointercancel") {
+    return;
+  }
+
+  if (mode === "paint") {
+    const cell = getCellFromClientPoint(event.clientX, event.clientY);
+    if (setCompletedStateForCell(cell, paintCompleted)) {
+      syncCompletedCellUi();
+    }
+    return;
+  }
+
+  if (!wasDrag) {
     toggleCompletedCellFromClientPoint(event.clientX, event.clientY);
   }
 }
@@ -1501,38 +1542,63 @@ function getCellFromClientPoint(clientX, clientY) {
   return { column, row };
 }
 
-function toggleCompletedCellFromClientPoint(clientX, clientY) {
-  if (!viewerState.rows || !viewerState.columns) {
-    return;
+function getCellKey(cell) {
+  if (!cell) {
+    return null;
+  }
+
+  return `${cell.row}:${cell.column}`;
+}
+
+function isCellCompleted(cell) {
+  const key = getCellKey(cell);
+  return key ? viewerState.completedCells.has(key) : false;
+}
+
+function setCompletedStateForCell(cell, nextCompleted = null) {
+  if (!viewerState.rows || !viewerState.columns || !cell) {
+    return false;
   }
 
   const activeColorCodes = getActivePaletteCodes();
   if (activeColorCodes.length === 0) {
-    return;
-  }
-
-  const cell = getCellFromClientPoint(clientX, clientY);
-  if (!cell) {
-    return;
+    return false;
   }
 
   const code = viewerState.gridCodes[cell.row]?.[cell.column];
   if (!code || !activeColorCodes.includes(code)) {
-    return;
+    return false;
   }
 
-  const key = `${cell.row}:${cell.column}`;
-  if (viewerState.completedCells.has(key)) {
-    viewerState.completedCells.delete(key);
-  } else {
+  const key = getCellKey(cell);
+  const isCompleted = viewerState.completedCells.has(key);
+  const shouldComplete = nextCompleted === null ? !isCompleted : nextCompleted;
+  if (shouldComplete === isCompleted) {
+    return false;
+  }
+
+  if (shouldComplete) {
     viewerState.completedCells.add(key);
+  } else {
+    viewerState.completedCells.delete(key);
   }
 
+  return true;
+}
+
+function syncCompletedCellUi() {
   drawGuideCanvas();
   renderPaletteDetails();
   updatePaletteFilterUi();
   updateViewerNote();
   updateViewerDetail();
+}
+
+function toggleCompletedCellFromClientPoint(clientX, clientY) {
+  const cell = getCellFromClientPoint(clientX, clientY);
+  if (setCompletedStateForCell(cell)) {
+    syncCompletedCellUi();
+  }
 }
 
 function updateHoveredCellFromClientPoint(clientX, clientY) {
@@ -1571,13 +1637,13 @@ function updateViewerNote() {
   const activeColorProgress = getActiveColorProgressText();
   const spacer = "\u00A0\u00A0";
   if (activeColorCodes.length > 1 && viewerState.activeColorCode) {
-    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요.\n${activeColorCodes.length}색 표시 중${spacer}현재 ${viewerState.activeColorCode}${activeColorProgress}\n클릭해서 흐리게 체크할 수 있습니다.`;
+    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요.\n${activeColorCodes.length}색 표시 중${spacer}현재 ${viewerState.activeColorCode}${activeColorProgress}\n좌클릭으로 토글하고, 휠 버튼을 누른 채 지나가면 연속 체크 또는 해제됩니다.`;
     return;
   }
 
   if (viewerState.activeColorCode) {
     const color = viewerState.paletteByCode.get(viewerState.activeColorCode);
-    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요.\n현재 ${color?.code || viewerState.activeColorCode}${activeColorProgress}\n클릭해서 흐리게 체크할 수 있습니다.`;
+    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요.\n현재 ${color?.code || viewerState.activeColorCode}${activeColorProgress}\n좌클릭으로 토글하고, 휠 버튼을 누른 채 지나가면 연속 체크 또는 해제됩니다.`;
     return;
   }
 
