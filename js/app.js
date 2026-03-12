@@ -1830,10 +1830,6 @@ function updatePaletteFilterUi() {
   if (!paletteFilterNote) {
     return;
   }
-  if (!viewerState.rows || !viewerState.columns) {
-    paletteFilterNote.textContent = "도안을 생성하면 사용 색상 기준으로 자동 정리됩니다.";
-    return;
-  }
   paletteFilterNote.textContent = "";
 }
 
