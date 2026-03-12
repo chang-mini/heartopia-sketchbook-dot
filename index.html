@@ -162,6 +162,19 @@
       border-bottom: 1px solid rgba(35, 27, 23, .08);
     }
 
+    .sidebar-brand-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand-stack {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
     .sidebar-brand h1 {
       margin: 0;
       font-family: "Noto Serif KR", Georgia, serif;
@@ -184,6 +197,37 @@
       color: var(--muted);
       font-size: 13px;
       line-height: 1.5;
+    }
+
+    .brand-doc-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      padding: 0 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(35, 27, 23, .12);
+      background: rgba(255, 255, 255, .82);
+      color: var(--muted-strong);
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1;
+      text-decoration: none;
+      white-space: nowrap;
+      box-shadow: 0 10px 24px rgba(80, 52, 32, .08);
+      transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease;
+    }
+
+    .brand-doc-link:hover {
+      transform: translateY(-1px);
+      border-color: rgba(187, 92, 50, .28);
+      background: rgba(255, 248, 242, .96);
+      box-shadow: 0 12px 28px rgba(80, 52, 32, .12);
+    }
+
+    .brand-doc-link:focus-visible {
+      outline: 3px solid rgba(187, 92, 50, .24);
+      outline-offset: 2px;
     }
 
     .sidebar-section {
@@ -1258,6 +1302,15 @@
 
     @media (max-width:760px) {
 
+      .sidebar-brand-head {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .brand-doc-link {
+        align-self: flex-start;
+      }
+
       .panel,
       .sidebar-shell,
       .inspector-shell {
@@ -1321,8 +1374,14 @@
       <aside class="sidebar">
         <section class="sidebar-shell">
           <div class="sidebar-brand">
-            <h1>뜌타 스케치북</h1>
-            <span class="brand-subtitle">by. 짱만</span>
+            <div class="sidebar-brand-head">
+              <div class="brand-stack">
+                <h1>뜌타 스케치북</h1>
+                <span class="brand-subtitle">by. 짱만</span>
+              </div>
+              <a class="brand-doc-link" href="https://github.com/chang-mini/heartopia-sketchbook-dot/blob/main/README.md"
+                target="_blank" rel="noreferrer">설명서</a>
+            </div>
           </div>
           <section class="sidebar-section">
             <form id="conversion-form" class="setup-grid">
