@@ -133,15 +133,3 @@ export const PALETTE = [
   { code: "P9", group: "Pink", hex_value: "#bcadb1", rgb: [188, 173, 177] },
   { code: "P10", group: "Pink", hex_value: "#725e66", rgb: [114, 94, 102] },
 ];
-
-export const PALETTE_ORDER = Object.fromEntries(PALETTE.map((color, index) => [color.code, index]));
-
-export function getPreset(ratio, precision) {
-  const ratioPresets = CANVAS_PRESETS[ratio];
-  if (!ratioPresets || !ratioPresets[precision]) {
-    throw new Error("지원하지 않는 비율 또는 정밀도입니다.");
-  }
-
-  const [width, height] = ratioPresets[precision];
-  return { ratio, precision, width, height };
-}

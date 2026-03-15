@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>두근두근타운 스케치북 Dot</title>
+  <title>두근두근타운 스케치북</title>
   <style>
     :root {
       --bg: #efe9dc;
@@ -80,10 +80,6 @@
       background: var(--panel-soft);
       backdrop-filter: blur(18px);
       box-shadow: var(--shadow);
-    }
-
-    .topbar {
-      display: none;
     }
 
     .note {
@@ -162,19 +158,6 @@
       border-bottom: 1px solid rgba(35, 27, 23, .08);
     }
 
-    .sidebar-brand-head {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 12px;
-    }
-
-    .brand-stack {
-      display: grid;
-      gap: 4px;
-      min-width: 0;
-    }
-
     .sidebar-brand h1 {
       margin: 0;
       font-family: "Noto Serif KR", Georgia, serif;
@@ -199,37 +182,6 @@
       line-height: 1.5;
     }
 
-    .brand-doc-link {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 38px;
-      padding: 0 14px;
-      border-radius: 999px;
-      border: 1px solid rgba(35, 27, 23, .12);
-      background: rgba(255, 255, 255, .82);
-      color: var(--muted-strong);
-      font-size: 13px;
-      font-weight: 800;
-      line-height: 1;
-      text-decoration: none;
-      white-space: nowrap;
-      box-shadow: 0 10px 24px rgba(80, 52, 32, .08);
-      transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease;
-    }
-
-    .brand-doc-link:hover {
-      transform: translateY(-1px);
-      border-color: rgba(187, 92, 50, .28);
-      background: rgba(255, 248, 242, .96);
-      box-shadow: 0 12px 28px rgba(80, 52, 32, .12);
-    }
-
-    .brand-doc-link:focus-visible {
-      outline: 3px solid rgba(187, 92, 50, .24);
-      outline-offset: 2px;
-    }
-
     .sidebar-section {
       display: grid;
       gap: 10px;
@@ -241,13 +193,91 @@
 
     .workspace-main {
       display: grid;
-      grid-template-rows: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
       gap: 24px;
       height: 100%;
       min-height: 100%;
       padding: 24px 26px;
       overflow: hidden;
       align-content: stretch;
+    }
+
+    .mode-bar {
+      display: grid;
+      gap: 10px;
+      align-content: start;
+      padding: 18px 22px;
+    }
+
+    .mode-bar-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .mode-bar-title {
+      display: grid;
+      gap: 3px;
+    }
+
+    .mode-bar-title strong {
+      font-size: 17px;
+      letter-spacing: -.02em;
+    }
+
+    .mode-tabs {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px;
+      border-radius: 999px;
+      background: rgba(93, 71, 54, .08);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55);
+    }
+
+    .mode-tab {
+      width: auto;
+      min-width: 112px;
+      min-height: 44px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      color: var(--muted-strong);
+      background: transparent;
+      box-shadow: none;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .mode-tab:hover:not(:disabled) {
+      transform: none;
+      box-shadow: none;
+      border-color: rgba(35, 27, 23, .08);
+      background: rgba(255, 255, 255, .6);
+    }
+
+    .mode-tab.is-active {
+      color: #fff9f3;
+      background: linear-gradient(135deg, #4f3a2d, #8d5c43);
+      box-shadow: 0 12px 22px rgba(79, 58, 45, .18);
+    }
+
+    .mode-tab:disabled {
+      cursor: not-allowed;
+      opacity: .52;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .mode-summary {
+      min-height: 0;
+      font-size: 13px;
+    }
+
+    .mode-summary:empty {
+      display: none;
     }
 
     .panel-badge {
@@ -278,6 +308,12 @@
       letter-spacing: .02em;
     }
 
+    .field-note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
     input,
     select,
     button {
@@ -297,6 +333,14 @@
       color: var(--ink);
       background: #fffefb;
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7);
+    }
+
+    input:disabled,
+    select:disabled {
+      color: rgba(78, 68, 63, .82);
+      background: linear-gradient(180deg, rgba(244, 236, 225, .92), rgba(236, 226, 214, .92));
+      cursor: not-allowed;
+      opacity: 1;
     }
 
     input:focus,
@@ -378,62 +422,18 @@
       font-size: 13px;
     }
 
-    .support-card {
-      display: grid;
-      gap: 10px;
-      padding: 14px;
-      border-radius: 18px;
-      border: 1px solid rgba(187, 92, 50, .16);
-      background: linear-gradient(180deg, rgba(255, 248, 240, .96), rgba(251, 239, 228, .9));
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .62);
+    .book-range-field[hidden] {
+      display: none;
     }
 
-    .support-card strong {
-      font-size: 14px;
-      letter-spacing: -.01em;
+    .mode-locked-note {
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(187, 92, 50, .14);
+      background: linear-gradient(180deg, rgba(255, 248, 240, .96), rgba(248, 237, 225, .92));
       color: var(--muted-strong);
-    }
-
-    .support-link {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 46px;
-      padding: 10px 16px;
-      border-radius: 14px;
-      border: 1px solid rgba(35, 27, 23, .12);
-      background: #fff;
-      color: var(--ink);
-      font-size: 14px;
-      font-weight: 800;
-      letter-spacing: -.01em;
-      text-decoration: none;
-      box-shadow: 0 10px 18px rgba(35, 27, 23, .08);
-      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
-    }
-
-    .support-link:hover {
-      transform: translateY(-1px);
-      border-color: rgba(187, 92, 50, .26);
-      box-shadow: 0 14px 24px rgba(35, 27, 23, .12);
-    }
-
-    .support-link:focus-visible {
-      outline: none;
-      border-color: rgba(187, 92, 50, .52);
-      box-shadow: 0 0 0 4px rgba(187, 92, 50, .14);
-    }
-
-    .support-link.kakao-link {
-      background: linear-gradient(180deg, #fff7cf, #ffe978);
-      border-color: rgba(119, 93, 0, .16);
-      color: #4a3a00;
-      box-shadow: 0 12px 20px rgba(126, 103, 11, .12);
-    }
-
-    .support-link.kakao-link:hover {
-      border-color: rgba(119, 93, 0, .24);
-      box-shadow: 0 16px 24px rgba(126, 103, 11, .18);
+      font-size: 12px;
+      line-height: 1.55;
     }
 
     .setup-grid {
@@ -453,8 +453,8 @@
 
     .crop-stage {
       display: grid;
-      gap: 14px;
-      padding: 16px;
+      gap: 10px;
+      padding: 12px;
       scroll-margin-top: 12px;
       border-radius: 22px;
       border: 1px solid rgba(35, 27, 23, .08);
@@ -462,8 +462,39 @@
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3);
     }
 
+    body.crop-stage-expanded {
+      overflow: hidden;
+    }
+
+    body.crop-stage-expanded::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 1190;
+      background:
+        radial-gradient(circle at top, rgba(255, 244, 232, .18), transparent 42%),
+        rgba(51, 31, 18, .36);
+      backdrop-filter: blur(10px);
+    }
+
     .crop-stage[hidden] {
       display: none;
+    }
+
+    .crop-stage.is-expanded {
+      position: fixed;
+      inset: clamp(18px, 4vw, 34px);
+      z-index: 1200;
+      padding: clamp(18px, 2vw, 24px);
+      gap: 16px;
+      border-radius: 30px;
+      border: 1px solid rgba(120, 79, 47, .14);
+      background:
+        linear-gradient(180deg, rgba(255, 249, 242, .96), rgba(248, 238, 224, .94));
+      box-shadow:
+        0 28px 72px rgba(47, 29, 18, .24),
+        inset 0 1px 0 rgba(255, 255, 255, .82);
+      overflow: auto;
     }
 
     .crop-head,
@@ -477,17 +508,106 @@
 
     .crop-head {
       flex-direction: column;
+      align-items: flex-start;
+      justify-content: flex-start;
+      gap: 8px;
+    }
+
+    .crop-head-main {
+      width: 100%;
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
       justify-content: flex-start;
       gap: 10px;
+    }
+
+    .crop-head-main>div:first-child {
+      min-width: 0;
+      flex: 0 0 auto;
     }
 
     .crop-actions {
       display: inline-flex;
       align-items: center;
       justify-content: flex-start;
-      gap: 8px;
-      flex-wrap: wrap;
+      gap: 6px;
+      flex-wrap: nowrap;
       flex-shrink: 0;
+    }
+
+    .expanded-book-segment-wrap {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      padding: 4px 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(35, 27, 23, .08);
+      background: rgba(255, 255, 255, .76);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .72);
+    }
+
+    .expanded-crop-modal.is-book-mode .expanded-book-segment-wrap {
+      display: inline-flex;
+    }
+
+    .expanded-book-segment-wrap label {
+      color: var(--muted-strong);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .expanded-book-segment-select {
+      width: auto;
+      min-width: min(320px, 48vw);
+      min-height: 38px;
+      padding: 6px 34px 6px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      background: #fffefb;
+    }
+
+    .expanded-sketchbook-options {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      padding: 4px 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(35, 27, 23, .08);
+      background: rgba(255, 255, 255, .76);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .72);
+      flex-wrap: wrap;
+    }
+
+    .expanded-control-field {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .expanded-control-field label {
+      color: var(--muted-strong);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .expanded-crop-select {
+      width: auto;
+      min-width: 92px;
+      min-height: 38px;
+      padding: 6px 34px 6px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      background: #fffefb;
+    }
+
+    .expanded-crop-select.compact {
+      min-width: 72px;
     }
 
     .crop-actions .ghost-button {
@@ -495,10 +615,25 @@
     }
 
     .crop-action-button {
-      min-width: 104px;
-      min-height: 44px;
-      padding: 9px 14px;
+      min-width: 84px;
+      min-height: 36px;
+      padding: 6px 10px;
       white-space: nowrap;
+    }
+
+    .crop-expand-button {
+      width: auto;
+      min-width: 60px;
+      padding-left: 10px;
+      padding-right: 10px;
+    }
+
+    .crop-submit-button {
+      display: inline-flex;
+      width: auto;
+      min-width: 116px;
+      padding-left: 12px;
+      padding-right: 12px;
     }
 
     .crop-head strong,
@@ -592,6 +727,72 @@
       background: radial-gradient(circle at top, #f5ecdf, #dbc9b4);
     }
 
+    .book-segment-overlays {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .book-segment-overlays[hidden] {
+      display: none;
+    }
+
+    .book-segment-overlay {
+      position: absolute;
+      border-radius: 0;
+      border: 2px dashed rgba(74, 121, 97, .82);
+      background: rgba(74, 121, 97, .12);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, .45), inset 0 0 0 1px rgba(255, 255, 255, .4);
+    }
+
+    .book-segment-overlay.current {
+      border-style: solid;
+      border-color: rgba(228, 111, 67, .96);
+      background: rgba(228, 111, 67, .18);
+    }
+
+    .book-segment-overlay.guide {
+      z-index: 4;
+      border-style: solid;
+      border-color: rgba(255, 255, 255, .92);
+      background: rgba(28, 33, 41, .12);
+      box-shadow:
+        0 0 0 1px rgba(38, 25, 18, .16),
+        inset 0 0 0 1px rgba(255, 255, 255, .28);
+    }
+
+    .book-segment-overlay.guide .book-segment-overlay-label {
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 24px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: rgba(255, 251, 245, .92);
+      color: #5f4030;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: -.01em;
+      white-space: nowrap;
+      box-shadow: 0 8px 16px rgba(58, 38, 25, .12);
+    }
+
+    .book-segment-overlay.guide.compact .book-segment-overlay-label {
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      min-width: 0;
+      min-height: 54px;
+      padding: 6px 4px;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+    }
+
     .crop-image {
       display: block;
       width: 100%;
@@ -600,12 +801,105 @@
       background: #efe5d8;
     }
 
+    .expanded-crop-modal .crop-image {
+      width: auto;
+      max-width: 100%;
+      height: min(72vh, 820px);
+      max-height: min(72vh, 820px);
+      margin: 0 auto;
+    }
+
+    .expanded-crop-modal .crop-shell {
+      border-radius: 28px;
+    }
+
+    .expanded-crop-modal .crop-frame {
+      min-height: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    .expanded-crop-modal .crop-meta {
+      font-size: 13px;
+    }
+
+    .expanded-crop-modal {
+      position: fixed;
+      inset: clamp(18px, 4vw, 34px);
+      z-index: 1200;
+      display: grid;
+      align-items: stretch;
+    }
+
+    .expanded-crop-modal[hidden] {
+      display: none;
+    }
+
+    .expanded-crop-panel {
+      display: grid;
+      gap: 14px;
+      padding: clamp(18px, 2vw, 24px);
+      border-radius: 30px;
+      border: 1px solid rgba(120, 79, 47, .14);
+      background:
+        linear-gradient(180deg, rgba(255, 249, 242, .96), rgba(248, 238, 224, .94));
+      box-shadow:
+        0 28px 72px rgba(47, 29, 18, .24),
+        inset 0 1px 0 rgba(255, 255, 255, .82);
+      overflow: auto;
+    }
+
+    .expanded-crop-head {
+      display: grid;
+      gap: 8px;
+    }
+
+    .expanded-crop-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .expanded-crop-actions {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 6px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+    }
+
+    .expanded-crop-actions .crop-action-button,
+    .expanded-crop-actions .ghost-button {
+      width: auto;
+      flex: 0 0 auto;
+      min-width: 74px;
+      min-height: 34px;
+      padding: 5px 10px;
+    }
+
+    .expanded-crop-actions .crop-submit-button {
+      min-width: 108px;
+    }
+
     .crop-box {
       position: absolute;
-      border: 2px solid rgba(255, 255, 255, .97);
-      border-radius: 20px;
-      box-shadow: 0 0 0 999px var(--crop-shadow), inset 0 0 0 1px rgba(35, 27, 23, .24);
+      border-radius: 0;
+      box-shadow: none;
       cursor: grab;
+    }
+
+    .crop-box::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      border: 2px solid rgba(255, 255, 255, .97);
+      box-shadow: inset 0 0 0 1px rgba(35, 27, 23, .24);
+      pointer-events: none;
     }
 
     .crop-box.is-dragging {
@@ -615,7 +909,8 @@
     .crop-guides {
       position: absolute;
       inset: 0;
-      border-radius: 18px;
+      z-index: 1;
+      border-radius: 0;
       background-image:
         linear-gradient(to right, transparent calc(33.333% - .5px), rgba(255, 255, 255, .78) calc(33.333% - .5px), rgba(255, 255, 255, .78) calc(33.333% + .5px), transparent calc(33.333% + .5px), transparent calc(66.666% - .5px), rgba(255, 255, 255, .78) calc(66.666% - .5px), rgba(255, 255, 255, .78) calc(66.666% + .5px), transparent calc(66.666% + .5px)),
         linear-gradient(to bottom, transparent calc(33.333% - .5px), rgba(255, 255, 255, .78) calc(33.333% - .5px), rgba(255, 255, 255, .78) calc(33.333% + .5px), transparent calc(33.333% + .5px), transparent calc(66.666% - .5px), rgba(255, 255, 255, .78) calc(66.666% - .5px), rgba(255, 255, 255, .78) calc(66.666% + .5px), transparent calc(66.666% + .5px));
@@ -624,6 +919,7 @@
 
     .crop-handle {
       position: absolute;
+      z-index: 2;
       width: 18px;
       height: 18px;
       border-radius: 50%;
@@ -854,7 +1150,6 @@
     }
 
     .palette-action-button,
-    .palette-reset,
     .palette-complete {
       width: auto;
       min-height: 42px;
@@ -882,6 +1177,64 @@
     .palette-complete:hover:not(:disabled) {
       border-color: rgba(64, 148, 97, .38);
       box-shadow: 0 12px 20px rgba(42, 115, 71, .12);
+    }
+
+    .support-card {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(187, 92, 50, .16);
+      background: linear-gradient(180deg, rgba(255, 248, 240, .96), rgba(251, 239, 228, .9));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .62);
+    }
+
+    .support-card strong {
+      font-size: 14px;
+      letter-spacing: -.01em;
+      color: var(--muted-strong);
+    }
+
+    .support-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      padding: 10px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(35, 27, 23, .12);
+      background: #fff;
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: -.01em;
+      text-decoration: none;
+      box-shadow: 0 10px 18px rgba(35, 27, 23, .08);
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+
+    .support-link:hover {
+      transform: translateY(-1px);
+      border-color: rgba(187, 92, 50, .26);
+      box-shadow: 0 14px 24px rgba(35, 27, 23, .12);
+    }
+
+    .support-link:focus-visible {
+      outline: none;
+      border-color: rgba(187, 92, 50, .52);
+      box-shadow: 0 0 0 4px rgba(187, 92, 50, .14);
+    }
+
+    .support-link.kakao-link {
+      background: linear-gradient(180deg, #fff7cf, #ffe978);
+      border-color: rgba(119, 93, 0, .16);
+      color: #4a3a00;
+      box-shadow: 0 12px 20px rgba(126, 103, 11, .12);
+    }
+
+    .support-link.kakao-link:hover {
+      border-color: rgba(119, 93, 0, .24);
+      box-shadow: 0 16px 24px rgba(126, 103, 11, .18);
     }
 
     .palette-support {
@@ -1215,7 +1568,7 @@
       }
 
       .palette-action-button,
-      .palette-reset {
+      .palette-complete {
         flex: 0 0 auto;
       }
 
@@ -1232,7 +1585,6 @@
         background: linear-gradient(180deg, rgba(255, 252, 246, .9), rgba(239, 229, 214, .92));
         box-shadow: var(--shadow);
       }
-
     }
 
     @media (max-width:1180px) {
@@ -1285,6 +1637,21 @@
         height: auto;
       }
 
+      .mode-bar-head {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .mode-tabs {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .mode-tab {
+        min-width: 0;
+      }
+
       .palette-sidebar {
         position: static;
         inset: auto;
@@ -1302,15 +1669,6 @@
 
     @media (max-width:760px) {
 
-      .sidebar-brand-head {
-        flex-direction: column;
-        align-items: stretch;
-      }
-
-      .brand-doc-link {
-        align-self: flex-start;
-      }
-
       .panel,
       .sidebar-shell,
       .inspector-shell {
@@ -1323,6 +1681,10 @@
         flex-direction: column;
       }
 
+      .mode-tabs {
+        grid-template-columns: 1fr;
+      }
+
       .ghost-button,
       .viewer-actions,
       .viewer-button {
@@ -1330,13 +1692,16 @@
       }
 
       .crop-actions {
-        width: 100%;
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: auto;
+        display: inline-flex;
+      }
+
+      .crop-head-main {
+        align-items: center;
       }
 
       .crop-actions .ghost-button {
-        width: 100%;
+        width: auto;
       }
 
       .palette-toolbar-actions {
@@ -1363,25 +1728,12 @@
 
 <body>
   <main>
-    <section class="topbar">
-      <div class="brand-stack">
-        <h1>뜌타 스케치북</h1>
-        <span class="brand-subtitle">by. 짱만</span>
-      </div>
-    </section>
-
     <section class="workspace">
       <aside class="sidebar">
         <section class="sidebar-shell">
           <div class="sidebar-brand">
-            <div class="sidebar-brand-head">
-              <div class="brand-stack">
-                <h1>뜌타 스케치북</h1>
-                <span class="brand-subtitle">by. 짱만</span>
-              </div>
-              <a class="brand-doc-link" href="https://github.com/chang-mini/heartopia-sketchbook-dot"
-                target="_blank" rel="noreferrer">설명서</a>
-            </div>
+            <h1>뜌타 스케치북</h1>
+            <span class="brand-subtitle">by. 짱만</span>
           </div>
           <section class="sidebar-section">
             <form id="conversion-form" class="setup-grid">
@@ -1408,6 +1760,18 @@
                   <option value="4" selected>4</option>
                 </select>
               </div>
+              <div class="mode-locked-note" id="mode-locked-note" hidden>
+                책 모드는 <strong>16:9</strong>, 정밀도 <strong>4</strong>로 고정됩니다. 범위 선택 후 도안 생성합니다.
+              </div>
+              <div class="field book-range-field" id="book-range-field" hidden>
+                <label for="book-segment">책 범위 선택</label>
+                <select id="book-segment">
+                  <option value="back_cover">뒷면표지</option>
+                  <option value="spine">책등</option>
+                  <option value="front_cover">앞면표지</option>
+                  <option value="full">전체</option>
+                </select>
+              </div>
               <button id="submit-button" type="button">도안 생성 시작</button>
             </form>
           </section>
@@ -1423,18 +1787,23 @@
           <section class="sidebar-section">
             <div class="crop-stage" id="crop-stage" hidden>
               <div class="crop-head">
-                <div>
-                  <strong>범위 선택</strong>
+                <div class="crop-head-main">
+                  <div>
+                    <strong>범위 선택</strong>
+                  </div>
                 </div>
                 <div class="crop-actions">
                   <button class="ghost-button crop-action-button" id="reset-crop" type="button">가운데 맞춤</button>
                   <button class="ghost-button crop-action-button" id="full-crop" type="button">전체선택</button>
+                  <button class="ghost-button crop-action-button crop-expand-button" id="expand-crop" type="button"
+                    aria-pressed="false">확대</button>
                 </div>
               </div>
               <div class="crop-shell">
-                <div class="crop-frame" id="crop-frame">
+                <div class="crop-frame" id="crop-frame" data-crop-view="sidebar">
                   <img class="crop-image" id="crop-image" alt="업로드한 사진 미리보기">
-                  <div class="crop-box" id="crop-box" hidden>
+                  <div class="book-segment-overlays" id="book-segment-overlays" hidden></div>
+                  <div class="crop-box" id="crop-box" data-crop-view="sidebar" hidden>
                     <div class="crop-guides"></div>
                     <span class="crop-handle handle-nw" data-handle="nw"></span>
                     <span class="crop-handle handle-ne" data-handle="ne"></span>
@@ -1451,6 +1820,22 @@
       </aside>
 
       <section class="workspace-main">
+        <section class="panel mode-bar">
+          <div class="mode-bar-head">
+            <div class="mode-bar-title">
+              <strong>작업 모드</strong>
+              <p class="note">작업뷰 위에서 스케치북, 책 탭을 전환합니다.</p>
+            </div>
+            <div class="mode-tabs" id="mode-tabs" role="tablist" aria-label="작업 모드">
+              <button class="mode-tab is-active" id="mode-tab-sketchbook" data-mode-tab="sketchbook" type="button"
+                role="tab" aria-selected="true">스케치북</button>
+              <button class="mode-tab" id="mode-tab-book" data-mode-tab="book" type="button" role="tab"
+                aria-selected="false">책</button>
+            </div>
+          </div>
+          <p class="note mode-summary" id="mode-summary"></p>
+        </section>
+
         <section class="panel viewer-shell">
           <div class="viewer-head">
             <div class="viewer-summary">
@@ -1514,7 +1899,7 @@
             </span>
             <span class="palette-title-text">
               <strong>팔레트</strong>
-              <span class="palette-mode-indicator" id="palette-mode-indicator">원본</span>
+              <span class="palette-mode-indicator" id="palette-mode-indicator">원본모드</span>
             </span>
           </div>
           <div class="palette-toolbar-actions">
@@ -1531,18 +1916,82 @@
         <p class="note palette-filter-note" id="palette-filter-note"></p>
         <ul class="palette-grid" id="palette"></ul>
         <div class="support-card palette-support">
-          <strong>이 도구가 도움이 되셨다면 후원으로 응원해주세요.</strong>
+          <strong>도움이 되셨다면 후원으로 응원해주세요.</strong>
           <p class="note">GitHub Sponsors와 오픈카카오톡으로 후원하실 수 있습니다.</p>
           <a class="support-link" href="https://github.com/sponsors/chang-mini" target="_blank"
             rel="noreferrer">후원하기</a>
           <a class="support-link kakao-link" href="https://open.kakao.com/o/svvxQWki" target="_blank"
-            rel="noreferrer">커피한잔의 여유</a>
+            rel="noreferrer">개발자에게 커피를</a>
         </div>
       </section>
     </section>
   </main>
+  <div class="expanded-crop-modal" id="expanded-crop-modal" hidden>
+    <div class="expanded-crop-panel">
+      <div class="expanded-crop-head">
+        <div class="expanded-crop-main">
+          <div>
+            <strong>범위 선택 확대</strong>
+            <p class="note">확대 화면에서 범위를 바로 조절하고 적용합니다.</p>
+          </div>
+        </div>
+        <div class="expanded-crop-actions">
+          <div class="expanded-sketchbook-options" id="expanded-sketchbook-options" hidden>
+            <div class="expanded-control-field">
+              <label for="expanded-ratio">비율</label>
+              <select class="expanded-crop-select" id="expanded-ratio">
+                <option value="16:9">16:9</option>
+                <option value="4:3">4:3</option>
+                <option value="1:1">1:1</option>
+                <option value="3:4">3:4</option>
+                <option value="9:16">9:16</option>
+              </select>
+            </div>
+            <div class="expanded-control-field">
+              <label for="expanded-precision">정밀도</label>
+              <select class="expanded-crop-select compact" id="expanded-precision">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+              </select>
+            </div>
+          </div>
+          <div class="expanded-book-segment-wrap" id="expanded-book-segment-wrap" hidden>
+            <label for="expanded-book-segment">책 범위</label>
+            <select class="expanded-book-segment-select" id="expanded-book-segment">
+              <option value="back_cover">뒷면표지</option>
+              <option value="spine">책등</option>
+              <option value="front_cover">앞면표지</option>
+              <option value="full">전체</option>
+            </select>
+          </div>
+          <button class="ghost-button crop-action-button" id="expanded-reset-crop" type="button">가운데 맞춤</button>
+          <button class="ghost-button crop-action-button" id="expanded-full-crop" type="button">전체선택</button>
+          <button class="ghost-button crop-action-button crop-expand-button" id="expanded-close-crop"
+            type="button">닫기</button>
+          <button class="crop-action-button crop-submit-button" id="expanded-submit-crop" type="button">선택 범위에
+            적용</button>
+        </div>
+      </div>
+      <div class="crop-shell">
+        <div class="crop-frame" id="expanded-crop-frame" data-crop-view="expanded">
+          <img class="crop-image" id="expanded-crop-image" alt="업로드한 사진 확대 미리보기">
+          <div class="book-segment-overlays" id="expanded-book-segment-overlays" hidden></div>
+          <div class="crop-box" id="expanded-crop-box" data-crop-view="expanded" hidden>
+            <div class="crop-guides"></div>
+            <span class="crop-handle handle-nw" data-handle="nw"></span>
+            <span class="crop-handle handle-ne" data-handle="ne"></span>
+            <span class="crop-handle handle-sw" data-handle="sw"></span>
+            <span class="crop-handle handle-se" data-handle="se"></span>
+          </div>
+        </div>
+      </div>
+      <p class="note crop-meta" id="expanded-crop-meta">사진을 올리면 확대 화면에서 범위를 조절할 수 있습니다.</p>
+    </div>
+  </div>
   <script src="https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.js"></script>
-  <script type="module" src="./js/app.js"></script>
+  <script type="module" src="./js/app.js?v=20260315-githubiotest-3"></script>
 </body>
 
 </html>

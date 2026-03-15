@@ -7,14 +7,19 @@ from functools import lru_cache
 from PIL import Image, ImageOps
 
 from palette import PALETTE
-from presets import get_preset
+from presets import get_custom_preset
 
 RESAMPLING = getattr(Image, "Resampling", Image)
 
 
 def convert_dot_snapshot(payload_json: str) -> str:
     payload = json.loads(payload_json)
-    width, height = get_preset(payload["ratio"], int(payload["precision"]))
+    width, height = get_custom_preset(
+        payload["ratio"],
+        int(payload["precision"]),
+        payload.get("canvas_width"),
+        payload.get("canvas_height"),
+    )
 
     @lru_cache(maxsize=65536)
     def nearest_palette_color(red: int, green: int, blue: int) -> dict[str, object]:
@@ -32,7 +37,9 @@ def convert_dot_snapshot(payload_json: str) -> str:
         image = corrected.convert("RGBA")
         background = Image.new("RGBA", image.size, "white")
         composed = Image.alpha_composite(background, image).convert("RGB")
-        fitted = ImageOps.fit(composed, (width, height), method=RESAMPLING.LANCZOS)
+        # The browser crop box already defines the exact framing.
+        # Resize directly so the selected area is preserved without a second crop.
+        fitted = composed.resize((width, height), resample=RESAMPLING.LANCZOS)
         source_pixels = list(fitted.getdata())
 
     usage: Counter[str] = Counter()

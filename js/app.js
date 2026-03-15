@@ -1,4 +1,4 @@
-import { PALETTE, getPreset } from "./config.js";
+import { CANVAS_PRESETS, PALETTE } from "./config.js";
 
 const form = document.getElementById("conversion-form");
 const imageInput = document.getElementById("image");
@@ -12,6 +12,23 @@ const cropFrame = document.getElementById("crop-frame");
 const cropImage = document.getElementById("crop-image");
 const cropBox = document.getElementById("crop-box");
 const cropMeta = document.getElementById("crop-meta");
+const expandCropButton = document.getElementById("expand-crop");
+const expandedCropModal = document.getElementById("expanded-crop-modal");
+const expandedCropFrame = document.getElementById("expanded-crop-frame");
+const expandedCropImage = document.getElementById("expanded-crop-image");
+const expandedCropBox = document.getElementById("expanded-crop-box");
+const expandedCropMeta = document.getElementById("expanded-crop-meta");
+const expandedResetCropButton = document.getElementById("expanded-reset-crop");
+const expandedFullCropButton = document.getElementById("expanded-full-crop");
+const expandedCloseCropButton = document.getElementById("expanded-close-crop");
+const expandedSubmitCropButton = document.getElementById("expanded-submit-crop");
+const expandedSketchbookOptions = document.getElementById("expanded-sketchbook-options");
+const expandedRatioInput = document.getElementById("expanded-ratio");
+const expandedPrecisionInput = document.getElementById("expanded-precision");
+const expandedBookSegmentWrap = document.getElementById("expanded-book-segment-wrap");
+const expandedBookSegmentInput = document.getElementById("expanded-book-segment");
+const bookSegmentOverlays = document.getElementById("book-segment-overlays");
+const expandedBookSegmentOverlays = document.getElementById("expanded-book-segment-overlays");
 const statusPill = document.getElementById("status-pill");
 const progressBar = document.getElementById("progress-bar");
 const viewerNote = document.getElementById("viewer-note");
@@ -35,9 +52,55 @@ const palettePrevButton = document.getElementById("palette-prev");
 const paletteNextButton = document.getElementById("palette-next");
 const paletteMultiToggleButton = document.getElementById("palette-multi-toggle");
 const paletteCompleteButton = document.getElementById("palette-complete");
-const paletteModeIndicator = document.getElementById("palette-mode-indicator");
 const paletteFilterNote = document.getElementById("palette-filter-note");
+const paletteModeIndicator = document.getElementById("palette-mode-indicator");
+const modeSummary = document.getElementById("mode-summary");
+const modeLockedNote = document.getElementById("mode-locked-note");
+const bookRangeField = document.getElementById("book-range-field");
+const bookSegmentInput = document.getElementById("book-segment");
+const modeTabButtons = [...document.querySelectorAll("[data-mode-tab]")];
 const guideContext = guideCanvas?.getContext("2d");
+
+const APP_MODES = {
+  SKETCHBOOK: "sketchbook",
+  BOOK: "book",
+};
+
+const BOOK_LAYOUT = {
+  width: 150,
+  height: 84,
+  ratio: "16:9",
+  precision: 4,
+  blockedColumns: 5,
+  fadedColumns: 2,
+  spineColumns: 8,
+  segments: {
+    full: {
+      id: "full",
+      label: "전체",
+      startColumn: 5,
+      width: 140,
+    },
+    back_cover: {
+      id: "back_cover",
+      label: "뒷면표지",
+      startColumn: 5,
+      width: 66,
+    },
+    spine: {
+      id: "spine",
+      label: "책등",
+      startColumn: 71,
+      width: 8,
+    },
+    front_cover: {
+      id: "front_cover",
+      label: "앞면표지",
+      startColumn: 79,
+      width: 66,
+    },
+  },
+};
 
 const viewerState = {
   gridCodes: [],
@@ -64,10 +127,6 @@ const paletteState = {
   multiSelectEnabled: false,
   rememberedMultiColorCodes: [],
 };
-
-const PYODIDE_INDEX_URL = "https://cdn.jsdelivr.net/pyodide/v0.29.3/full/";
-const PYTHON_MODULE_DIR = "../python";
-const PYTHON_MODULE_FILES = ["palette.py", "presets.py", "converter.py"];
 
 const GROUP_MAIN_COLORS = {
   Black: "#000000",
@@ -106,31 +165,94 @@ const DEFAULT_PALETTE_ITEMS = PALETTE.map((item) => ({
   count: 0,
 }));
 
+const PALETTE_BY_CODE = new Map(PALETTE.map((item) => [item.code, item]));
+const PYODIDE_INDEX_URL = "https://cdn.jsdelivr.net/pyodide/v0.29.3/full/";
+const PYTHON_MODULE_DIR = "../python";
+const PYTHON_MODULE_FILES = ["palette.py", "presets.py", "converter.py"];
+const PYTHON_MODULE_VERSION = "20260315-2";
+
+let activeSocket = null;
+let activeJobId = null;
+let pollingHandle = null;
 let selectedFile = null;
 let sourceImageUrl = null;
 let cropSelection = null;
+let expandedCropSelection = null;
+let expandedCropDraft = null;
 let cropInteraction = null;
 let guideInteraction = null;
 let currentResultSnapshot = null;
 let lastViewportLayoutMode = getViewportLayoutMode();
+let activeMode = APP_MODES.SKETCHBOOK;
+let isCropStageExpanded = false;
+let pendingConversionContext = { mode: APP_MODES.SKETCHBOOK, bookSegmentId: null, bookSegmentCrop: null };
+let sketchbookSnapshot = null;
+let bookSnapshot = null;
 let pyodideReadyPromise = null;
+const modeUiStates = {
+  [APP_MODES.SKETCHBOOK]: {
+    snapshotKey: null,
+    state: createDefaultModeUiState(),
+  },
+  [APP_MODES.BOOK]: {
+    snapshotKey: null,
+    state: createDefaultModeUiState(),
+  },
+};
+let selectedBookSegmentId = bookSegmentInput?.value || "back_cover";
+let cropLayoutRefreshHandle = null;
+const cropResizeObserver = typeof ResizeObserver === "function"
+  ? new ResizeObserver(() => {
+    scheduleCropLayoutRefresh();
+  })
+  : null;
+const cropViews = {
+  sidebar: {
+    key: "sidebar",
+    stage: cropStage,
+    frame: cropFrame,
+    image: cropImage,
+    box: cropBox,
+    meta: cropMeta,
+    overlays: bookSegmentOverlays,
+  },
+  expanded: {
+    key: "expanded",
+    stage: expandedCropModal,
+    frame: expandedCropFrame,
+    image: expandedCropImage,
+    box: expandedCropBox,
+    meta: expandedCropMeta,
+    overlays: expandedBookSegmentOverlays,
+  },
+};
 
 imageInput?.addEventListener("change", handleImageSelection);
 ratioInput?.addEventListener("change", handleRatioChange);
+precisionInput?.addEventListener("change", handlePrecisionChange);
 form?.addEventListener("submit", startConversion);
 submitButton?.addEventListener("click", startConversion);
-resetCropButton?.addEventListener("click", resetCropSelection);
-fullCropButton?.addEventListener("click", selectFullCropSelection);
+expandedSubmitCropButton?.addEventListener("click", applyExpandedCropSelectionAndConvert);
+resetCropButton?.addEventListener("click", () => resetCropSelection("sidebar"));
+fullCropButton?.addEventListener("click", () => selectFullCropSelection("sidebar"));
+expandedResetCropButton?.addEventListener("click", () => resetCropSelection("expanded"));
+expandedFullCropButton?.addEventListener("click", () => selectFullCropSelection("expanded"));
+expandCropButton?.addEventListener("click", toggleCropStageExpanded);
+expandedCloseCropButton?.addEventListener("click", closeExpandedCropModal);
 cropImage?.addEventListener("load", handleCropImageLoaded);
 cropImage?.addEventListener("error", handleCropImageError);
+expandedCropImage?.addEventListener("load", handleExpandedCropImageLoaded);
+expandedCropImage?.addEventListener("error", handleExpandedCropImageError);
 cropImage?.addEventListener("dragstart", preventDefault);
+expandedCropImage?.addEventListener("dragstart", preventDefault);
 cropBox?.addEventListener("pointerdown", handleCropPointerDown);
-cropFrame?.addEventListener("dblclick", resetCropSelection);
+expandedCropBox?.addEventListener("pointerdown", handleCropPointerDown);
+cropFrame?.addEventListener("dblclick", () => resetCropSelection("sidebar"));
+expandedCropFrame?.addEventListener("dblclick", () => resetCropSelection("expanded"));
 guideViewport?.addEventListener("wheel", handleGuideWheel, { passive: false });
 guideViewport?.addEventListener("pointerdown", handleGuidePointerDown);
 guideViewport?.addEventListener("pointermove", handleGuideHover);
 guideViewport?.addEventListener("pointerleave", clearGuideHover);
-guideViewport?.addEventListener("auxclick", preventDefault);
 zoomOutButton?.addEventListener("click", () => zoomGuideAtViewportCenter(1 / 1.2));
 zoomResetButton?.addEventListener("click", () => fitGuideToViewport(true));
 zoomInButton?.addEventListener("click", () => zoomGuideAtViewportCenter(1.2));
@@ -140,6 +262,11 @@ paletteMultiToggleButton?.addEventListener("click", togglePaletteMultiSelect);
 paletteCompleteButton?.addEventListener("click", completeActiveColorCells);
 palettePrevButton?.addEventListener("click", () => shiftPalettePage(-1));
 paletteNextButton?.addEventListener("click", () => shiftPalettePage(1));
+bookSegmentInput?.addEventListener("change", handleBookSegmentChange);
+expandedBookSegmentInput?.addEventListener("change", handleBookSegmentChange);
+expandedRatioInput?.addEventListener("change", handleExpandedRatioChange);
+expandedPrecisionInput?.addEventListener("change", handleExpandedPrecisionChange);
+modeTabButtons.forEach((button) => button.addEventListener("click", handleModeTabClick));
 window.addEventListener("pointermove", handleCropPointerMove);
 window.addEventListener("pointerup", handleCropPointerEnd);
 window.addEventListener("pointercancel", handleCropPointerEnd);
@@ -147,14 +274,513 @@ window.addEventListener("pointermove", handleGuidePointerMove);
 window.addEventListener("pointerup", handleGuidePointerEnd);
 window.addEventListener("pointercancel", handleGuidePointerEnd);
 window.addEventListener("resize", handleWindowResize);
+window.addEventListener("keydown", handleWindowKeyDown);
 window.addEventListener("beforeunload", releaseSourceImage);
+
+cropResizeObserver?.observe(cropFrame);
+cropResizeObserver?.observe(cropImage);
+cropResizeObserver?.observe(expandedCropFrame);
+cropResizeObserver?.observe(expandedCropImage);
 
 renderSelectedFile();
 renderCropSelection();
 resetResultArea();
+applyModeUi();
+
+function handleModeTabClick(event) {
+  const nextMode = event.currentTarget?.dataset.modeTab;
+  if (!nextMode || nextMode === activeMode) {
+    return;
+  }
+  setActiveMode(nextMode);
+}
+
+function handleBookSegmentChange(event) {
+  selectedBookSegmentId = event.target.value;
+  if (bookSegmentInput && event.target !== bookSegmentInput) {
+    bookSegmentInput.value = selectedBookSegmentId;
+  }
+  if (expandedBookSegmentInput && event.target !== expandedBookSegmentInput) {
+    expandedBookSegmentInput.value = selectedBookSegmentId;
+  }
+  if (activeMode === APP_MODES.BOOK) {
+    const targetViewKey = event.target === expandedBookSegmentInput && isCropStageExpanded ? "expanded" : "sidebar";
+    if (getNaturalCropImageElement()?.naturalWidth) {
+      applyDefaultCropSelection(targetViewKey);
+      if (targetViewKey === "expanded") {
+        syncExpandedSelectionToSidebar();
+      }
+    }
+    updateViewerNote();
+    updateModeSummary();
+  }
+}
+
+function setActiveMode(nextMode) {
+  if (!Object.values(APP_MODES).includes(nextMode) || nextMode === activeMode) {
+    return;
+  }
+
+  persistCurrentSnapshotByMode();
+  persistCurrentModeUiState();
+
+  activeMode = nextMode;
+  stopTracking();
+  submitButton.disabled = false;
+  applyModeUi();
+
+  if (cropImage?.naturalWidth) {
+    applyDefaultCropSelection();
+  }
+
+  if (activeMode === APP_MODES.SKETCHBOOK) {
+    if (sketchbookSnapshot) {
+      applyModeSnapshot(sketchbookSnapshot);
+    } else {
+      resetResultArea();
+    }
+    return;
+  }
+
+  if (bookSnapshot) {
+    applyModeSnapshot(bookSnapshot);
+  } else {
+    renderEmptyBookWorkspace();
+  }
+}
+
+function applyModeUi() {
+  const isBookMode = activeMode === APP_MODES.BOOK;
+  if (submitButton) {
+    submitButton.textContent = "도안 생성 시작";
+  }
+  if (ratioInput) {
+    ratioInput.disabled = isBookMode;
+    if (isBookMode) {
+      ratioInput.value = BOOK_LAYOUT.ratio;
+    }
+  }
+  if (precisionInput) {
+    precisionInput.disabled = isBookMode;
+    if (isBookMode) {
+      precisionInput.value = String(BOOK_LAYOUT.precision);
+    }
+  }
+  if (modeLockedNote) {
+    modeLockedNote.hidden = !isBookMode;
+  }
+  if (bookRangeField) {
+    bookRangeField.hidden = !isBookMode;
+  }
+  if (bookSegmentInput) {
+    bookSegmentInput.value = selectedBookSegmentId;
+  }
+  if (expandedBookSegmentInput) {
+    expandedBookSegmentInput.value = selectedBookSegmentId;
+  }
+  if (expandedBookSegmentWrap) {
+    expandedBookSegmentWrap.hidden = !isBookMode;
+  }
+  if (expandedSketchbookOptions) {
+    expandedSketchbookOptions.hidden = isBookMode;
+  }
+  syncExpandedSketchbookControls();
+  expandedCropModal?.classList.toggle("is-book-mode", isBookMode);
+
+  modeTabButtons.forEach((button) => {
+    const isActive = button.dataset.modeTab === activeMode;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+
+  updateModeSummary();
+}
+
+function updateModeSummary() {
+  if (!modeSummary) {
+    renderBookCropOverlays();
+    return;
+  }
+  modeSummary.textContent = "";
+  renderBookCropOverlays();
+}
+
+function renderEmptyBookWorkspace() {
+  prepareGuideViewer("책 모드 작업을 시작할 수 있습니다. 왼쪽에서 범위를 고른 뒤 이미지를 적용하세요.");
+  loadGuideGrid(createEmptyGridCodes(BOOK_LAYOUT.width, BOOK_LAYOUT.height, ""), []);
+  currentResultSnapshot = {
+    canvas_mode: APP_MODES.BOOK,
+    book_selected_segment: selectedBookSegmentId,
+    book_applied_segments: [],
+    book_segment_crops: {},
+  };
+  updateSaveButtonState(false);
+  setPaletteVisibility(false);
+  updateViewerNote();
+  renderBookCropOverlays();
+}
+
+function createEmptyGridCodes(width, height, fillCode = "") {
+  return Array.from({ length: height }, () => Array.from({ length: width }, () => fillCode));
+}
+
+function cloneGridCodes(gridCodes) {
+  return gridCodes.map((row) => [...row]);
+}
+
+function getBookSegment(segmentId) {
+  return BOOK_LAYOUT.segments[segmentId] || BOOK_LAYOUT.segments.back_cover;
+}
+
+function getBookFullGuideSegments() {
+  return [
+    BOOK_LAYOUT.segments.back_cover,
+    BOOK_LAYOUT.segments.spine,
+    BOOK_LAYOUT.segments.front_cover,
+  ];
+}
+
+function buildBookSnapshotFromGrid(gridCodes, sourceFilename = null, appliedSegments = [], segmentCrops = {}) {
+  return {
+    job_id: `book-${Date.now()}`,
+    filename: sourceFilename || currentResultSnapshot?.filename || selectedFile?.name || "book-cover.png",
+    ratio: BOOK_LAYOUT.ratio,
+    precision: BOOK_LAYOUT.precision,
+    width: BOOK_LAYOUT.width,
+    height: BOOK_LAYOUT.height,
+    status: "completed",
+    progress: 100,
+    message: "책 작업 도안",
+    created_at: currentResultSnapshot?.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    used_colors: buildUsedColorsFromGrid(gridCodes),
+    grid_codes: gridCodes,
+    canvas_mode: APP_MODES.BOOK,
+    book_selected_segment: selectedBookSegmentId,
+    book_applied_segments: normalizeBookAppliedSegments(appliedSegments),
+    book_segment_crops: normalizeBookSegmentCrops(segmentCrops),
+  };
+}
+
+function normalizeBookAppliedSegments(segments) {
+  if (!Array.isArray(segments)) {
+    return [];
+  }
+  const seen = new Set();
+  return segments.filter((segmentId) => {
+    if (!BOOK_LAYOUT.segments[segmentId] || seen.has(segmentId)) {
+      return false;
+    }
+    seen.add(segmentId);
+    return true;
+  });
+}
+
+function normalizeBookSegmentCrops(crops) {
+  if (!crops || typeof crops !== "object") {
+    return {};
+  }
+
+  const normalized = {};
+  for (const [segmentId, crop] of Object.entries(crops)) {
+    if (!BOOK_LAYOUT.segments[segmentId]) {
+      continue;
+    }
+    const normalizedCrop = normalizeStoredBookCrop(crop);
+    if (!normalizedCrop) {
+      continue;
+    }
+    normalized[segmentId] = normalizedCrop;
+  }
+  return normalized;
+}
+
+function normalizeStoredBookCrop(crop) {
+  if (!crop || typeof crop !== "object") {
+    return null;
+  }
+
+  const x = Number(crop.x);
+  const y = Number(crop.y);
+  const width = Number(crop.width);
+  const height = Number(crop.height);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) {
+    return null;
+  }
+  if (x < 0 || y < 0 || width <= 0 || height <= 0) {
+    return null;
+  }
+
+  const normalizedWidth = clamp(width, 0.02, 1);
+  const normalizedHeight = clamp(height, 0.02, 1);
+  return {
+    x: clamp(x, 0, 1 - normalizedWidth),
+    y: clamp(y, 0, 1 - normalizedHeight),
+    width: normalizedWidth,
+    height: normalizedHeight,
+    source_filename: typeof crop.source_filename === "string" && crop.source_filename.trim()
+      ? crop.source_filename.trim()
+      : null,
+  };
+}
+
+function buildCurrentBookSegmentCrop() {
+  if (!cropSelection) {
+    return null;
+  }
+
+  return normalizeStoredBookCrop({
+    ...cropSelection,
+    source_filename: selectedFile?.name || null,
+  });
+}
+
+function buildUsedColorsFromGrid(gridCodes) {
+  const counts = new Map();
+  for (const row of gridCodes) {
+    for (const code of row) {
+      if (!code || !PALETTE_BY_CODE.has(code)) {
+        continue;
+      }
+      counts.set(code, (counts.get(code) || 0) + 1);
+    }
+  }
+
+  return [...counts.entries()]
+    .map(([code, count]) => ({ ...PALETTE_BY_CODE.get(code), count }))
+    .sort((left, right) => {
+      const leftIndex = PALETTE.findIndex((item) => item.code === left.code);
+      const rightIndex = PALETTE.findIndex((item) => item.code === right.code);
+      return leftIndex - rightIndex;
+    });
+}
+
+function mergeBookSegmentIntoGrid(baseGridCodes, segmentId, segmentGridCodes) {
+  const segment = getBookSegment(segmentId);
+  const nextGridCodes = cloneGridCodes(baseGridCodes);
+  for (let row = 0; row < BOOK_LAYOUT.height; row += 1) {
+    for (let offset = 0; offset < segment.width; offset += 1) {
+      nextGridCodes[row][segment.startColumn + offset] = segmentGridCodes[row]?.[offset] || "";
+    }
+  }
+  return nextGridCodes;
+}
+
+function setPaletteVisibility(visible) {
+  if (paletteSidebar) {
+    paletteSidebar.hidden = false;
+  }
+  mainShell?.classList.add("has-palette-sidebar");
+}
+
+function getVisibleCropViews() {
+  return isCropStageExpanded ? [cropViews.sidebar, cropViews.expanded] : [cropViews.sidebar];
+}
+
+function getReferenceCropView() {
+  return isCropStageExpanded ? cropViews.expanded : cropViews.sidebar;
+}
+
+function getCropViewByKey(viewKey) {
+  return cropViews[viewKey] || cropViews.sidebar;
+}
+
+function getCropSelectionForView(viewKey) {
+  return viewKey === "expanded" ? expandedCropSelection : cropSelection;
+}
+
+function setCropSelectionForView(viewKey, selection) {
+  if (viewKey === "expanded") {
+    expandedCropSelection = selection ? { ...selection } : null;
+    expandedCropDraft = null;
+    return;
+  }
+  cropSelection = selection ? { ...selection } : null;
+}
+
+function cloneCropSelection(selection) {
+  return selection ? { ...selection } : null;
+}
+
+function cloneDisplayCropRect(rect) {
+  return rect ? { ...rect } : null;
+}
+
+function syncExpandedSelectionToSidebar() {
+  if (!expandedCropSelection) {
+    return;
+  }
+  cropSelection = { ...expandedCropSelection };
+}
+
+function getNaturalCropImageElement() {
+  if (cropViews.sidebar.image?.naturalWidth) {
+    return cropViews.sidebar.image;
+  }
+  if (cropViews.expanded.image?.naturalWidth) {
+    return cropViews.expanded.image;
+  }
+  return null;
+}
+
+function getCropDisplayMetrics(view = cropViews.sidebar) {
+  if (!view?.frame || !view?.image) {
+    return null;
+  }
+
+  const frameRect = view.frame.getBoundingClientRect();
+  const imageRect = view.image.getBoundingClientRect();
+  if (!frameRect.width || !frameRect.height || !imageRect.width || !imageRect.height) {
+    return null;
+  }
+
+  return {
+    viewportLeft: imageRect.left,
+    viewportTop: imageRect.top,
+    width: imageRect.width,
+    height: imageRect.height,
+    offsetLeft: imageRect.left - frameRect.left,
+    offsetTop: imageRect.top - frameRect.top,
+  };
+}
+
+function buildDisplayCropRect(selection, view) {
+  const metrics = getCropDisplayMetrics(view);
+  if (!selection || !metrics) {
+    return null;
+  }
+
+  return {
+    left: selection.x * metrics.width,
+    top: selection.y * metrics.height,
+    width: selection.width * metrics.width,
+    height: selection.height * metrics.height,
+    frameWidth: metrics.width,
+    frameHeight: metrics.height,
+  };
+}
+
+function isDisplayCropRectAligned(rect, metrics) {
+  if (!rect || !metrics) {
+    return false;
+  }
+
+  return Math.abs((rect.frameWidth || 0) - metrics.width) < 0.5
+    && Math.abs((rect.frameHeight || 0) - metrics.height) < 0.5;
+}
+
+function normalizeDisplayCropRect(rect, frameWidth = rect?.frameWidth, frameHeight = rect?.frameHeight) {
+  if (!rect || !frameWidth || !frameHeight) {
+    return null;
+  }
+
+  return normalizeCropSelection(rect.left, rect.top, rect.width, rect.height, frameWidth, frameHeight);
+}
+
+function scheduleCropLayoutRefresh() {
+  if (cropLayoutRefreshHandle) {
+    window.cancelAnimationFrame(cropLayoutRefreshHandle);
+  }
+  cropLayoutRefreshHandle = window.requestAnimationFrame(() => {
+    cropLayoutRefreshHandle = null;
+    renderCropSelection();
+  });
+}
+
+function renderBookCropOverlays() {
+  getVisibleCropViews().forEach((view) => renderBookCropOverlaysOnView(view));
+}
+
+function renderBookCropOverlaysOnView(view) {
+  if (!view?.overlays) {
+    return;
+  }
+
+  const naturalImage = getNaturalCropImageElement();
+  if (activeMode !== APP_MODES.BOOK || !naturalImage?.naturalWidth) {
+    view.overlays.hidden = true;
+    view.overlays.innerHTML = "";
+    return;
+  }
+
+  const metrics = getCropDisplayMetrics(view);
+  if (!metrics) {
+    view.overlays.hidden = true;
+    view.overlays.innerHTML = "";
+    return;
+  }
+
+  const appliedSegments = normalizeBookAppliedSegments(currentResultSnapshot?.book_applied_segments || bookSnapshot?.book_applied_segments || []);
+  const segmentCrops = normalizeBookSegmentCrops(currentResultSnapshot?.book_segment_crops || bookSnapshot?.book_segment_crops);
+  const currentSourceFilename = selectedFile?.name || null;
+  const overlayHtml = [];
+
+  for (const segmentId of appliedSegments) {
+    const crop = segmentCrops[segmentId];
+    if (!crop) {
+      continue;
+    }
+    if (currentSourceFilename && crop.source_filename && crop.source_filename !== currentSourceFilename) {
+      continue;
+    }
+    const className = segmentId === selectedBookSegmentId ? "book-segment-overlay current" : "book-segment-overlay";
+    overlayHtml.push(`
+      <div
+        class="${className}"
+        data-book-segment="${segmentId}"
+        style="left:${metrics.offsetLeft + (crop.x * metrics.width)}px;top:${metrics.offsetTop + (crop.y * metrics.height)}px;width:${crop.width * metrics.width}px;height:${crop.height * metrics.height}px;"
+      ></div>
+    `);
+  }
+
+  if (selectedBookSegmentId === "full") {
+    const selection = getCropSelectionForView(view.key) || (view.key === "expanded" ? cropSelection : null);
+    overlayHtml.push(...buildBookFullGuideOverlays(selection, metrics));
+  }
+
+  view.overlays.hidden = overlayHtml.length === 0;
+  view.overlays.innerHTML = overlayHtml.join("");
+}
+
+function buildBookFullGuideOverlays(selection, metrics) {
+  if (!selection || !metrics) {
+    return [];
+  }
+
+  const fullSegment = getBookSegment("full");
+  if (!fullSegment.width) {
+    return [];
+  }
+
+  const selectionLeft = metrics.offsetLeft + (selection.x * metrics.width);
+  const selectionTop = metrics.offsetTop + (selection.y * metrics.height);
+  const selectionWidth = selection.width * metrics.width;
+  const selectionHeight = selection.height * metrics.height;
+  let offset = 0;
+
+  return getBookFullGuideSegments().map((segment) => {
+    const segmentLeft = selectionLeft + ((offset / fullSegment.width) * selectionWidth);
+    const segmentWidth = (segment.width / fullSegment.width) * selectionWidth;
+    offset += segment.width;
+    const compactClass = segmentWidth <= 44 ? " compact" : "";
+
+    return `
+      <div
+        class="book-segment-overlay guide${compactClass}"
+        data-book-guide="${segment.id}"
+        style="left:${segmentLeft}px;top:${selectionTop}px;width:${segmentWidth}px;height:${selectionHeight}px;"
+      >
+        <span class="book-segment-overlay-label">${segment.label.replace("표지", "")}</span>
+      </div>
+    `;
+  });
+}
 
 async function startConversion(event) {
   event?.preventDefault();
+  if (isCropStageExpanded) {
+    setCropStageExpanded(false);
+  }
   const file = selectedFile ?? imageInput.files?.[0];
   if (!file) {
     renderError("이미지 파일을 먼저 선택해 주세요.");
@@ -170,17 +796,41 @@ async function startConversion(event) {
   renderSelectedFile();
   stopTracking();
   submitButton.disabled = true;
-  resetResultArea("도안 생성 결과를 준비하는 중입니다.");
-  setStatus("준비 중", "선택한 영역을 브라우저 안에서 정리하고 있습니다.", 8);
+  pendingConversionContext = {
+    mode: activeMode,
+    bookSegmentId: activeMode === APP_MODES.BOOK ? selectedBookSegmentId : null,
+    bookSegmentCrop: activeMode === APP_MODES.BOOK ? buildCurrentBookSegmentCrop() : null,
+  };
+  if (activeMode === APP_MODES.BOOK && bookSnapshot) {
+    setGuideMessage("선택한 책 범위를 새 이미지로 덮어쓰는 중입니다.");
+  } else if (activeMode === APP_MODES.BOOK) {
+    renderEmptyBookWorkspace();
+    setGuideMessage("책 범위를 변환하는 중입니다.");
+  } else {
+    resetResultArea("도안 생성 결과를 준비하는 중입니다.");
+  }
+  setStatus("범위 처리 중", "선택한 영역을 잘라 브라우저 안에서 도안을 생성하고 있습니다.", 8);
 
   try {
     const uploadFile = await buildUploadFile(file);
+    const ratio = activeMode === APP_MODES.BOOK ? BOOK_LAYOUT.ratio : ratioInput.value;
+    const precision = activeMode === APP_MODES.BOOK ? BOOK_LAYOUT.precision : Number(precisionInput.value);
+    let canvasWidth = null;
+    let canvasHeight = null;
+    if (activeMode === APP_MODES.BOOK) {
+      const bookSegment = getBookSegment(selectedBookSegmentId);
+      canvasWidth = bookSegment.width;
+      canvasHeight = BOOK_LAYOUT.height;
+    }
     const snapshot = await convertImageLocally({
       file: uploadFile,
       originalName: file.name,
-      ratio: ratioInput.value,
-      precision: Number(precisionInput.value),
+      ratio,
+      precision,
+      canvasWidth,
+      canvasHeight,
     });
+    activeJobId = snapshot.job_id;
     handleSnapshot(snapshot);
   } catch (error) {
     if (savedStatus) {
@@ -197,9 +847,12 @@ async function startConversion(event) {
 
 function handleImageSelection() {
   const nextFile = imageInput.files?.[0] ?? null;
+  if (!nextFile) {
+    return;
+  }
   const isValidImageFile = nextFile
     ? ["image/png", "image/jpeg", "image/webp"].includes(nextFile.type)
-      || /\.(png|jpe?g|webp)$/i.test(nextFile.name)
+    || /\.(png|jpe?g|webp)$/i.test(nextFile.name)
     : false;
 
   if (nextFile && !isValidImageFile) {
@@ -213,7 +866,11 @@ function handleImageSelection() {
     if (!currentResultSnapshot) {
       stopTracking();
       setStatus("대기 중", "이미지를 업로드하면 변환이 시작됩니다.", 0);
-      resetResultArea();
+      if (activeMode === APP_MODES.BOOK) {
+        renderEmptyBookWorkspace();
+      } else {
+        resetResultArea();
+      }
     }
     window.alert("잘못된 파일형식입니다.");
     return;
@@ -230,8 +887,24 @@ function handleImageSelection() {
   renderSelectedFile();
   stopTracking();
   submitButton.disabled = false;
-  setStatus("대기 중", selectedFile ? "비율에 맞는 범위를 고른 뒤 변환을 시작하세요." : "이미지를 업로드하면 변환이 시작됩니다.", 0);
-  resetResultArea();
+  setStatus(
+    "대기 중",
+    selectedFile
+      ? activeMode === APP_MODES.BOOK
+        ? "책 범위를 고른 뒤 선택한 영역에 이미지를 적용하세요."
+        : "비율에 맞는 범위를 고른 뒤 변환을 시작하세요."
+      : "이미지를 업로드하면 변환이 시작됩니다.",
+    0,
+  );
+  if (activeMode === APP_MODES.BOOK) {
+    if (bookSnapshot) {
+      renderCompleted(bookSnapshot);
+    } else {
+      renderEmptyBookWorkspace();
+    }
+  } else {
+    resetResultArea();
+  }
 
   if (!selectedFile) {
     clearCropPreview();
@@ -242,47 +915,114 @@ function handleImageSelection() {
 }
 
 function handleRatioChange() {
+  syncExpandedSketchbookControls();
+  if (activeMode !== APP_MODES.SKETCHBOOK) {
+    return;
+  }
   if (!selectedFile) {
     return;
   }
 
   if (cropImage?.naturalWidth) {
-    resetCropSelection();
+    const targetViewKey = isCropStageExpanded ? "expanded" : "sidebar";
+    applyDefaultCropSelection(targetViewKey);
+    if (targetViewKey === "expanded") {
+      syncExpandedSelectionToSidebar();
+    }
+  }
+}
+
+function handlePrecisionChange() {
+  syncExpandedSketchbookControls();
+}
+
+function handleExpandedRatioChange(event) {
+  if (ratioInput) {
+    ratioInput.value = event.target.value;
+  }
+  handleRatioChange();
+}
+
+function handleExpandedPrecisionChange(event) {
+  if (precisionInput) {
+    precisionInput.value = event.target.value;
+  }
+  handlePrecisionChange();
+}
+
+function syncExpandedSketchbookControls() {
+  if (expandedRatioInput && ratioInput) {
+    expandedRatioInput.value = ratioInput.value;
+  }
+  if (expandedPrecisionInput && precisionInput) {
+    expandedPrecisionInput.value = precisionInput.value;
   }
 }
 
 function handleCropImageLoaded() {
   cropStage.hidden = false;
   cropImage.alt = selectedFile ? `업로드한 사진 미리보기: ${selectedFile.name}` : "업로드한 사진 미리보기";
-  resetCropSelection();
+  applyDefaultCropSelection("sidebar");
   cropStage.scrollIntoView({ behavior: "smooth", block: "nearest" });
   setStatus("대기 중", "비율에 맞는 범위를 고른 뒤 변환을 시작하세요.", 0);
 }
 
+function handleExpandedCropImageLoaded() {
+  expandedCropImage.alt = selectedFile ? `업로드한 사진 확대 미리보기: ${selectedFile.name}` : "업로드한 사진 확대 미리보기";
+  if (isCropStageExpanded && !expandedCropSelection) {
+    expandedCropSelection = cloneCropSelection(cropSelection) || createCropSelection(0.9, "expanded");
+  }
+  expandedCropDraft = null;
+  scheduleCropLayoutRefresh();
+}
+
 function handleCropImageError() {
   cropSelection = null;
+  setCropStageExpanded(false);
   renderCropSelection();
   cropStage.hidden = true;
   renderError("업로드한 이미지를 미리보기로 불러오지 못했습니다.");
 }
 
+function handleExpandedCropImageError() {
+  if (expandedCropModal) {
+    expandedCropModal.hidden = true;
+  }
+  expandedCropSelection = null;
+  expandedCropDraft = null;
+}
+
 function loadCropPreview(file) {
   releaseSourceImage();
   cropSelection = null;
+  expandedCropSelection = null;
+  expandedCropDraft = null;
   renderCropSelection();
   cropStage.hidden = false;
   cropStage.scrollIntoView({ behavior: "smooth", block: "nearest" });
   cropMeta.textContent = "원본 이미지를 불러오는 중입니다.";
   sourceImageUrl = URL.createObjectURL(file);
   cropImage.src = sourceImageUrl;
+  if (expandedCropImage) {
+    expandedCropImage.src = sourceImageUrl;
+  }
 }
 
 function clearCropPreview() {
   releaseSourceImage();
   cropSelection = null;
+  expandedCropSelection = null;
+  expandedCropDraft = null;
+  setCropStageExpanded(false);
   cropStage.hidden = true;
+  if (expandedCropModal) {
+    expandedCropModal.hidden = true;
+  }
   renderCropSelection();
   cropMeta.textContent = "사진을 올리면 여기서 변환할 범위를 선택할 수 있습니다.";
+  if (expandedCropMeta) {
+    expandedCropMeta.textContent = "사진을 올리면 확대 화면에서 범위를 조절할 수 있습니다.";
+  }
 }
 
 function releaseSourceImage() {
@@ -292,26 +1032,90 @@ function releaseSourceImage() {
   }
 }
 
-function resetCropSelection() {
-  if (!cropImage?.naturalWidth || !cropImage?.naturalHeight) {
-    return;
-  }
+function toggleCropStageExpanded() {
+  setCropStageExpanded(!isCropStageExpanded);
+}
 
-  cropSelection = createCenteredCropSelection();
+function setCropStageExpanded(nextExpanded) {
+  isCropStageExpanded = Boolean(nextExpanded) && !cropStage?.hidden;
+  if (expandedCropModal) {
+    expandedCropModal.hidden = !isCropStageExpanded;
+    expandedCropModal.classList.toggle("is-book-mode", activeMode === APP_MODES.BOOK);
+  }
+  if (isCropStageExpanded) {
+    expandedCropSelection = cloneCropSelection(cropSelection) || createCropSelection(0.9, "expanded");
+    expandedCropDraft = null;
+    if (expandedCropImage && sourceImageUrl) {
+      expandedCropImage.src = sourceImageUrl;
+    }
+  } else {
+    expandedCropSelection = null;
+    expandedCropDraft = null;
+  }
+  document.body.classList.toggle("crop-stage-expanded", isCropStageExpanded);
+  if (expandCropButton) {
+    expandCropButton.textContent = isCropStageExpanded ? "닫기" : "확대";
+    expandCropButton.setAttribute("aria-pressed", isCropStageExpanded ? "true" : "false");
+    expandCropButton.title = isCropStageExpanded ? "큰 범위선택 화면 닫기" : "범위선택 크게 보기";
+  }
+  if (isCropStageExpanded) {
+    scheduleCropLayoutRefresh();
+    window.setTimeout(() => scheduleCropLayoutRefresh(), 60);
+  }
+}
+
+function closeExpandedCropModal() {
+  syncExpandedSelectionToSidebar();
+  setCropStageExpanded(false);
   renderCropSelection();
 }
 
-function selectFullCropSelection() {
-  if (!cropImage?.naturalWidth || !cropImage?.naturalHeight) {
+function applyExpandedCropSelectionAndConvert(event) {
+  syncExpandedSelectionToSidebar();
+  startConversion(event);
+}
+
+function handleWindowKeyDown(event) {
+  if (event.key === "Escape" && isCropStageExpanded) {
+    closeExpandedCropModal();
+  }
+}
+
+function resetCropSelection(viewKey = "sidebar") {
+  const view = getCropViewByKey(viewKey);
+  const naturalImage = view.image?.naturalWidth ? view.image : getNaturalCropImageElement();
+  if (!naturalImage?.naturalWidth || !naturalImage?.naturalHeight) {
     return;
   }
 
-  cropSelection = createFullCropSelection();
+  setCropSelectionForView(viewKey, createCenteredCropSelection(viewKey));
   renderCropSelection();
 }
 
-function createCenteredCropSelection() {
-  return createCropSelection(0.9);
+function applyDefaultCropSelection(viewKey = "sidebar") {
+  const view = getCropViewByKey(viewKey);
+  const naturalImage = view.image?.naturalWidth ? view.image : getNaturalCropImageElement();
+  if (!naturalImage?.naturalWidth || !naturalImage?.naturalHeight) {
+    return;
+  }
+
+  setCropSelectionForView(viewKey, createCenteredCropSelection(viewKey));
+  renderCropSelection();
+}
+
+function selectFullCropSelection(viewKey = "sidebar") {
+  const view = getCropViewByKey(viewKey);
+  const naturalImage = view.image?.naturalWidth ? view.image : getNaturalCropImageElement();
+  if (!naturalImage?.naturalWidth || !naturalImage?.naturalHeight) {
+    return;
+  }
+
+  setCropSelectionForView(viewKey, createFullCropSelection());
+  renderCropSelection();
+}
+
+function createCenteredCropSelection(viewKey = "sidebar") {
+  return createCropSelection(0.9, viewKey);
 }
 
 function createFullCropSelection() {
@@ -323,84 +1127,172 @@ function createFullCropSelection() {
   };
 }
 
-function createCropSelection(maxCoverage) {
-  const imageRatio = cropImage.naturalWidth / cropImage.naturalHeight;
+function createCropSelection(maxCoverage, viewKey = getReferenceCropView().key) {
+  const referenceView = getCropViewByKey(viewKey);
+  const metrics = getCropDisplayMetrics(referenceView);
+  const naturalImage = referenceView.image?.naturalWidth ? referenceView.image : getNaturalCropImageElement();
+  const imageWidth = metrics?.width || naturalImage?.naturalWidth || cropImage.naturalWidth;
+  const imageHeight = metrics?.height || naturalImage?.naturalHeight || cropImage.naturalHeight;
   const targetRatio = getTargetCropRatio();
-  const normalizedRatio = targetRatio / imageRatio;
-  let width = maxCoverage;
-  let height = width / normalizedRatio;
+  const minDimension = 0.02;
+  let width = imageWidth * maxCoverage;
+  let height = width / targetRatio;
 
-  if (!Number.isFinite(height) || height > maxCoverage) {
-    height = maxCoverage;
-    width = height * normalizedRatio;
+  if (!Number.isFinite(height) || height > imageHeight * maxCoverage) {
+    height = imageHeight * maxCoverage;
+    width = height * targetRatio;
   }
 
-  width = clamp(width, 0.08, 1);
-  height = clamp(height, 0.08, 1);
+  if (width < imageWidth * minDimension) {
+    width = imageWidth * minDimension;
+    height = width / targetRatio;
+  }
 
-  return {
-    x: (1 - width) / 2,
-    y: (1 - height) / 2,
-    width,
-    height,
-  };
+  if (height < imageHeight * minDimension) {
+    height = imageHeight * minDimension;
+    width = height * targetRatio;
+  }
+
+  if (width > imageWidth) {
+    width = imageWidth;
+    height = width / targetRatio;
+  }
+
+  if (height > imageHeight) {
+    height = imageHeight;
+    width = height * targetRatio;
+  }
+
+  const left = (imageWidth - width) / 2;
+  const top = (imageHeight - height) / 2;
+
+  return normalizeCropSelection(left, top, width, height, imageWidth, imageHeight);
 }
 
 function renderCropSelection() {
-  if (!cropBox || !cropSelection) {
-    if (cropBox) {
-      cropBox.hidden = true;
-      cropBox.classList.remove("is-dragging");
-    }
-    if (cropMeta && !selectedFile) {
-      cropMeta.textContent = "사진을 올리면 여기서 변환할 범위를 선택할 수 있습니다.";
+  getVisibleCropViews().forEach((view) => renderCropSelectionOnView(view));
+  renderBookCropOverlays();
+}
+
+function renderCropSelectionOnView(view) {
+  if (!view?.box) {
+    return;
+  }
+
+  const selection = getCropSelectionForView(view.key) || (view.key === "expanded" ? cropSelection : null);
+  if (!selection) {
+    view.box.hidden = true;
+    view.box.classList.remove("is-dragging");
+    if (view.meta && !selectedFile) {
+      view.meta.textContent = view.key === "expanded"
+        ? "사진을 올리면 확대 화면에서 범위를 조절할 수 있습니다."
+        : "사진을 올리면 여기서 변환할 범위를 선택할 수 있습니다.";
     }
     return;
   }
 
-  cropBox.hidden = false;
-  cropBox.style.left = `${cropSelection.x * 100}%`;
-  cropBox.style.top = `${cropSelection.y * 100}%`;
-  cropBox.style.width = `${cropSelection.width * 100}%`;
-  cropBox.style.height = `${cropSelection.height * 100}%`;
-  cropMeta.textContent = formatCropMeta();
-}
-
-function formatCropMeta() {
-  const cropPixels = getCropPixels();
-  if (!cropPixels) {
-    return "사진을 올리면 여기서 변환할 범위를 선택할 수 있습니다.";
+  const metrics = getCropDisplayMetrics(view);
+  if (!metrics) {
+    view.box.hidden = true;
+    return;
   }
 
-  return `선택 영역 ${cropPixels.width} x ${cropPixels.height}px | 비율 ${ratioInput.value} | 드래그로 이동, 모서리로 크기 조절`;
+  let displayRect = null;
+  if (view.key === "expanded") {
+    if (!isDisplayCropRectAligned(expandedCropDraft, metrics)) {
+      expandedCropDraft = buildDisplayCropRect(selection, view);
+    }
+    displayRect = expandedCropDraft;
+  } else {
+    displayRect = buildDisplayCropRect(selection, view);
+  }
+
+  if (!displayRect) {
+    view.box.hidden = true;
+    return;
+  }
+
+  view.box.hidden = false;
+  view.box.style.left = `${metrics.offsetLeft + displayRect.left}px`;
+  view.box.style.top = `${metrics.offsetTop + displayRect.top}px`;
+  view.box.style.width = `${displayRect.width}px`;
+  view.box.style.height = `${displayRect.height}px`;
+  if (view.meta) {
+    view.meta.textContent = formatCropMeta(view.key);
+  }
+}
+
+function formatCropMeta(viewKey = "sidebar") {
+  const selection = getCropSelectionForView(viewKey) || (viewKey === "expanded" ? cropSelection : null);
+  const cropPixels = getCropPixelsForSelection(selection);
+  if (!cropPixels) {
+    return viewKey === "expanded"
+      ? "사진을 올리면 확대 화면에서 범위를 조절할 수 있습니다."
+      : "사진을 올리면 여기서 변환할 범위를 선택할 수 있습니다.";
+  }
+
+  return `선택 영역 ${cropPixels.width} x ${cropPixels.height}px | 비율 ${getTargetCropRatioLabel()} | 드래그로 이동, 모서리로 크기 조절`;
 }
 
 function handleCropPointerDown(event) {
-  if (!cropSelection || !cropFrame) {
+  const viewKey = event.currentTarget?.dataset.cropView || "sidebar";
+  const view = getCropViewByKey(viewKey);
+  const selection = getCropSelectionForView(viewKey) || (viewKey === "expanded" ? cropSelection : null);
+  if (!selection || !view?.frame) {
     return;
   }
 
-  const frameRect = cropFrame.getBoundingClientRect();
-  if (!frameRect.width || !frameRect.height) {
+  const metrics = getCropDisplayMetrics(view);
+  if (!metrics) {
     return;
   }
+  let startRect = null;
+  if (viewKey === "expanded" && isDisplayCropRectAligned(expandedCropDraft, metrics)) {
+    startRect = cloneDisplayCropRect(expandedCropDraft);
+  } else {
+    startRect = buildDisplayCropRect(selection, view);
+  }
+  if (!startRect) {
+    return;
+  }
+  if (viewKey === "expanded") {
+    expandedCropDraft = cloneDisplayCropRect(startRect);
+  }
+
+  const startLeft = startRect.left;
+  const startTop = startRect.top;
+  const startWidth = startRect.width;
+  const startHeight = startRect.height;
+  const visibleSelection = normalizeDisplayCropRect(startRect, metrics.width, metrics.height);
 
   const handle = event.target.closest("[data-handle]")?.dataset.handle ?? null;
+  const handleEdgeX = handle?.includes("w") ? startLeft : startLeft + startWidth;
+  const handleEdgeY = handle?.includes("n") ? startTop : startTop + startHeight;
+  const pointerOffsetX = handle ? (event.clientX - (metrics.viewportLeft + handleEdgeX)) : 0;
+  const pointerOffsetY = handle ? (event.clientY - (metrics.viewportTop + handleEdgeY)) : 0;
   cropInteraction = {
     pointerId: event.pointerId,
     mode: handle ? "resize" : "move",
     handle,
     startPointerX: event.clientX,
     startPointerY: event.clientY,
-    frameLeft: frameRect.left,
-    frameTop: frameRect.top,
-    frameWidth: frameRect.width,
-    frameHeight: frameRect.height,
-    startSelection: { ...cropSelection },
+    frameLeft: metrics.viewportLeft,
+    frameTop: metrics.viewportTop,
+    frameWidth: metrics.width,
+    frameHeight: metrics.height,
+    startLeft,
+    startTop,
+    startWidth,
+    startHeight,
+    startSelection: visibleSelection,
+    startRect,
+    viewKey,
+    pointerOffsetX,
+    pointerOffsetY,
   };
 
-  cropBox.classList.add("is-dragging");
-  cropBox.setPointerCapture?.(event.pointerId);
+  view.box.classList.add("is-dragging");
+  view.box.setPointerCapture?.(event.pointerId);
   event.preventDefault();
 }
 
@@ -409,15 +1301,26 @@ function handleCropPointerMove(event) {
     return;
   }
 
-  const nextSelection = cropInteraction.mode === "move"
-    ? computeMovedSelection(cropInteraction, event)
-    : computeResizedSelection(cropInteraction, event);
+  if (cropInteraction.viewKey === "expanded") {
+    const nextRect = cropInteraction.mode === "move"
+      ? computeMovedDisplayRect(cropInteraction, event)
+      : computeResizedDisplayRect(cropInteraction, event);
+    if (!nextRect) {
+      return;
+    }
+    expandedCropDraft = nextRect;
+    expandedCropSelection = normalizeDisplayCropRect(nextRect, cropInteraction.frameWidth, cropInteraction.frameHeight);
+  } else {
+    const nextSelection = cropInteraction.mode === "move"
+      ? computeMovedSelection(cropInteraction, event)
+      : computeResizedSelection(cropInteraction, event);
 
-  if (!nextSelection) {
-    return;
+    if (!nextSelection) {
+      return;
+    }
+
+    setCropSelectionForView(cropInteraction.viewKey, nextSelection);
   }
-
-  cropSelection = nextSelection;
   renderCropSelection();
   event.preventDefault();
 }
@@ -427,29 +1330,43 @@ function handleCropPointerEnd(event) {
     return;
   }
 
-  cropBox.classList.remove("is-dragging");
-  cropBox.releasePointerCapture?.(event.pointerId);
+  const view = getCropViewByKey(cropInteraction.viewKey);
+  view.box?.classList.remove("is-dragging");
+  view.box?.releasePointerCapture?.(event.pointerId);
   cropInteraction = null;
 }
 
 function computeMovedSelection(session, event) {
+  const nextRect = computeMovedDisplayRect(session, event);
+  return normalizeDisplayCropRect(nextRect, session.frameWidth, session.frameHeight);
+}
+
+function computeMovedDisplayRect(session, event) {
   const dx = (event.clientX - session.startPointerX) / session.frameWidth;
   const dy = (event.clientY - session.startPointerY) / session.frameHeight;
 
   return {
-    ...session.startSelection,
-    x: clamp(session.startSelection.x + dx, 0, 1 - session.startSelection.width),
-    y: clamp(session.startSelection.y + dy, 0, 1 - session.startSelection.height),
+    left: clamp(session.startLeft + (dx * session.frameWidth), 0, session.frameWidth - session.startWidth),
+    top: clamp(session.startTop + (dy * session.frameHeight), 0, session.frameHeight - session.startHeight),
+    width: session.startWidth,
+    height: session.startHeight,
+    frameWidth: session.frameWidth,
+    frameHeight: session.frameHeight,
   };
 }
 
 function computeResizedSelection(session, event) {
-  const pointerX = clamp(event.clientX - session.frameLeft, 0, session.frameWidth);
-  const pointerY = clamp(event.clientY - session.frameTop, 0, session.frameHeight);
-  const startLeft = session.startSelection.x * session.frameWidth;
-  const startTop = session.startSelection.y * session.frameHeight;
-  const startWidth = session.startSelection.width * session.frameWidth;
-  const startHeight = session.startSelection.height * session.frameHeight;
+  const nextRect = computeResizedDisplayRect(session, event);
+  return normalizeDisplayCropRect(nextRect, session.frameWidth, session.frameHeight);
+}
+
+function computeResizedDisplayRect(session, event) {
+  const pointerX = clamp(event.clientX - session.frameLeft - (session.pointerOffsetX || 0), 0, session.frameWidth);
+  const pointerY = clamp(event.clientY - session.frameTop - (session.pointerOffsetY || 0), 0, session.frameHeight);
+  const startLeft = session.startLeft;
+  const startTop = session.startTop;
+  const startWidth = session.startWidth;
+  const startHeight = session.startHeight;
   const targetRatio = getTargetCropRatio();
   const minWidth = getMinimumCropWidth(session.frameWidth, session.frameHeight, targetRatio);
 
@@ -512,7 +1429,14 @@ function computeResizedSelection(session, event) {
     top = anchorY - height;
   }
 
-  return normalizeCropSelection(left, top, width, height, session.frameWidth, session.frameHeight);
+  return {
+    left,
+    top,
+    width,
+    height,
+    frameWidth: session.frameWidth,
+    frameHeight: session.frameHeight,
+  };
 }
 
 function normalizeCropSelection(left, top, width, height, frameWidth, frameHeight) {
@@ -530,25 +1454,30 @@ function normalizeCropSelection(left, top, width, height, frameWidth, frameHeigh
 }
 
 function getMinimumCropWidth(frameWidth, frameHeight, targetRatio) {
-  const minimumHeight = Math.max(48, Math.min(120, frameHeight * 0.18));
-  const minimumWidth = Math.max(72, minimumHeight * targetRatio);
+  const minimumHeight = frameHeight * 0.02;
+  const minimumWidth = Math.max(frameWidth * 0.02, minimumHeight * targetRatio);
   return Math.min(minimumWidth, frameWidth);
 }
 
 function getCropPixels() {
-  if (!cropSelection || !cropImage?.naturalWidth || !cropImage?.naturalHeight) {
+  return getCropPixelsForSelection(cropSelection);
+}
+
+function getCropPixelsForSelection(selection) {
+  const naturalImage = getNaturalCropImageElement();
+  if (!selection || !naturalImage?.naturalWidth || !naturalImage?.naturalHeight) {
     return null;
   }
 
-  let left = Math.round(cropSelection.x * cropImage.naturalWidth);
-  let top = Math.round(cropSelection.y * cropImage.naturalHeight);
-  let width = Math.round(cropSelection.width * cropImage.naturalWidth);
-  let height = Math.round(cropSelection.height * cropImage.naturalHeight);
+  let left = Math.round(selection.x * naturalImage.naturalWidth);
+  let top = Math.round(selection.y * naturalImage.naturalHeight);
+  let width = Math.round(selection.width * naturalImage.naturalWidth);
+  let height = Math.round(selection.height * naturalImage.naturalHeight);
 
-  width = clamp(Math.max(width, 1), 1, cropImage.naturalWidth);
-  height = clamp(Math.max(height, 1), 1, cropImage.naturalHeight);
-  left = clamp(left, 0, cropImage.naturalWidth - width);
-  top = clamp(top, 0, cropImage.naturalHeight - height);
+  width = clamp(Math.max(width, 1), 1, naturalImage.naturalWidth);
+  height = clamp(Math.max(height, 1), 1, naturalImage.naturalHeight);
+  left = clamp(left, 0, naturalImage.naturalWidth - width);
+  top = clamp(top, 0, naturalImage.naturalHeight - height);
 
   return { left, top, width, height };
 }
@@ -566,8 +1495,12 @@ function isFullCropSelection() {
 
 async function buildUploadFile(file) {
   const cropPixels = getCropPixels();
+  const naturalImage = getNaturalCropImageElement();
   if (!cropPixels) {
     return file;
+  }
+  if (!naturalImage) {
+    throw new Error("원본 이미지를 찾을 수 없습니다.");
   }
 
   const canvas = document.createElement("canvas");
@@ -591,18 +1524,33 @@ async function buildUploadFile(file) {
   if (!context) {
     throw new Error("이미지 크롭 캔버스를 만들 수 없습니다.");
   }
+  context.clearRect(0, 0, canvas.width, canvas.height);
 
-  context.drawImage(
-    cropImage,
-    cropPixels.left,
-    cropPixels.top,
-    cropPixels.width,
-    cropPixels.height,
-    0,
-    0,
-    canvas.width,
-    canvas.height,
-  );
+  if (isFullCropSelection() && Number.isFinite(targetRatio) && targetRatio > 0) {
+    context.drawImage(
+      naturalImage,
+      cropPixels.left,
+      cropPixels.top,
+      cropPixels.width,
+      cropPixels.height,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+  } else {
+    context.drawImage(
+      naturalImage,
+      cropPixels.left,
+      cropPixels.top,
+      cropPixels.width,
+      cropPixels.height,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+  }
 
   const preferredType = getPreferredUploadType(file.type);
   let blob = await canvasToBlob(canvas, preferredType);
@@ -640,19 +1588,52 @@ function buildCroppedFilename(filename, mimeType) {
   return `${baseName}-crop${extension}`;
 }
 
-async function convertImageLocally({ file, originalName, ratio, precision }) {
-  const preset = getPreset(ratio, precision);
+function getCanvasPreset(ratio, precision, canvasWidth = null, canvasHeight = null) {
+  if (Number.isFinite(canvasWidth) && Number.isFinite(canvasHeight)) {
+    return {
+      ratio,
+      precision,
+      width: Number(canvasWidth),
+      height: Number(canvasHeight),
+    };
+  }
+
+  const ratioPresets = CANVAS_PRESETS[ratio];
+  const size = ratioPresets?.[precision];
+  if (!size) {
+    throw new Error(`지원하지 않는 비율 또는 정밀도입니다: ${ratio} / ${precision}`);
+  }
+
+  return {
+    ratio,
+    precision,
+    width: size[0],
+    height: size[1],
+  };
+}
+
+async function convertImageLocally({
+  file,
+  originalName,
+  ratio,
+  precision,
+  canvasWidth = null,
+  canvasHeight = null,
+}) {
+  const preset = getCanvasPreset(ratio, precision, canvasWidth, canvasHeight);
   const pyodide = await ensurePythonRuntime();
   await nextFrame();
-  setStatus("파이썬 처리 중", `${preset.width} x ${preset.height} 도안을 같은 로직으로 변환하는 중입니다.`, 32);
+  setStatus("로컬 변환 중", `${preset.width} x ${preset.height} 도안을 브라우저 안에서 생성하고 있습니다.`, 32);
   const mapped = await convertWithPythonRuntime(pyodide, {
     file,
     originalName,
     ratio,
     precision,
-    preset,
+    canvasWidth: preset.width,
+    canvasHeight: preset.height,
   });
 
+  const timestamp = new Date().toISOString();
   return {
     job_id: `local-${Date.now()}`,
     filename: originalName,
@@ -660,9 +1641,9 @@ async function convertImageLocally({ file, originalName, ratio, precision }) {
     precision,
     status: "completed",
     progress: 100,
-    message: "브라우저에서 도트 도안 생성을 완료했습니다.",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    message: "브라우저 안에서 도안 생성이 완료되었습니다.",
+    created_at: timestamp,
+    updated_at: timestamp,
     width: preset.width,
     height: preset.height,
     used_colors: mapped.used_colors,
@@ -677,12 +1658,12 @@ async function ensurePythonRuntime() {
 
   pyodideReadyPromise = (async () => {
     if (typeof globalThis.loadPyodide !== "function") {
-      throw new Error("Pyodide 런타임을 불러오지 못했습니다.");
+      throw new Error("Pyodide 엔진을 불러오지 못했습니다.");
     }
 
-    setStatus("런타임 준비 중", "Python 엔진을 불러오는 중입니다.", 6);
+    setStatus("파이썬 준비 중", "브라우저용 Python 엔진을 불러오는 중입니다.", 6);
     const pyodide = await globalThis.loadPyodide({ indexURL: PYODIDE_INDEX_URL });
-    setStatus("런타임 준비 중", "Pillow 패키지를 불러오는 중입니다.", 12);
+    setStatus("파이썬 준비 중", "이미지 처리를 위한 Pillow를 불러오는 중입니다.", 12);
     await pyodide.loadPackage("pillow");
     await syncPythonModules(pyodide);
     pyodide.runPython("from converter import convert_dot_snapshot");
@@ -692,7 +1673,14 @@ async function ensurePythonRuntime() {
   return pyodideReadyPromise;
 }
 
-async function convertWithPythonRuntime(pyodide, { file, originalName, ratio, precision, preset }) {
+async function convertWithPythonRuntime(pyodide, {
+  file,
+  originalName,
+  ratio,
+  precision,
+  canvasWidth,
+  canvasHeight,
+}) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const safeName = buildPythonSafeFilename(file.name || originalName || "upload.png");
   const inputPath = `/tmp/${Date.now()}-${safeName}`;
@@ -704,13 +1692,15 @@ async function convertWithPythonRuntime(pyodide, { file, originalName, ratio, pr
       filename: originalName,
       ratio,
       precision,
+      canvas_width: canvasWidth,
+      canvas_height: canvasHeight,
     });
 
     pyodide.globals.set("conversion_payload_json", payload);
     const resultJson = await pyodide.runPythonAsync("convert_dot_snapshot(conversion_payload_json)");
     pyodide.globals.delete("conversion_payload_json");
     await nextFrame();
-    setStatus("정리 중", "파이썬 변환 결과를 화면에 적용하는 중입니다.", 90);
+    setStatus("정리 중", "도안 결과를 화면에 적용하는 중입니다.", 90);
     return JSON.parse(resultJson);
   } finally {
     try {
@@ -732,7 +1722,7 @@ async function syncPythonModules(pyodide) {
   }
 
   for (const moduleFile of PYTHON_MODULE_FILES) {
-    const moduleUrl = new URL(`${PYTHON_MODULE_DIR}/${moduleFile}`, import.meta.url);
+    const moduleUrl = new URL(`${PYTHON_MODULE_DIR}/${moduleFile}?v=${PYTHON_MODULE_VERSION}`, import.meta.url);
     const response = await fetch(moduleUrl);
     if (!response.ok) {
       throw new Error(`Python 모듈을 불러오지 못했습니다: ${moduleFile}`);
@@ -746,22 +1736,6 @@ import sys
 if "/workspace" not in sys.path:
     sys.path.insert(0, "/workspace")
 `);
-}
-
-function loadImageElement(file) {
-  return new Promise((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file);
-    const image = new Image();
-    image.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      resolve(image);
-    };
-    image.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error("이미지 파일을 읽지 못했습니다."));
-    };
-    image.src = objectUrl;
-  });
 }
 
 function nextFrame() {
@@ -778,9 +1752,10 @@ async function saveCurrentConversion() {
   const filename = buildSavedFilename(currentResultSnapshot);
   const payload = {
     type: "duduta-dot-save",
-    version: 2,
+    version: 1,
     exported_at: new Date().toISOString(),
     snapshot: buildPortableSnapshot(currentResultSnapshot),
+    ui_state: captureCurrentModeUiState(),
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   triggerFileDownload(blob, filename);
@@ -808,6 +1783,7 @@ async function loadSavedFile(file) {
     if (!isPortableSnapshot(snapshot)) {
       throw new Error("지원하지 않는 저장 파일 형식입니다.");
     }
+    primeModeUiStateForSnapshot(snapshot, extractSavedUiState(payload));
     applyImportedConversion(snapshot, file.name);
   } catch (error) {
     if (savedStatus) {
@@ -823,11 +1799,11 @@ async function loadSavedFile(file) {
 
 function buildSavedFilename(snapshot) {
   const baseName = (snapshot.filename || "duduta-dot").replace(/\.[^.]+$/, "") || "duduta-dot";
-  return `${baseName}-${snapshot.ratio}-p${snapshot.precision}.dudot.json`;
+  const modeLabel = snapshot.canvas_mode === APP_MODES.BOOK ? "book" : "sketchbook";
+  return `${baseName}-${modeLabel}-${snapshot.ratio}-p${snapshot.precision}.dudot.json`;
 }
 
-function buildPortableSnapshot(snapshot, options = {}) {
-  const { preserveExistingUiState = false } = options;
+function buildPortableSnapshot(snapshot) {
   return {
     job_id: snapshot.job_id || `local-${Date.now()}`,
     filename: snapshot.filename || "saved-dot-guide",
@@ -837,47 +1813,144 @@ function buildPortableSnapshot(snapshot, options = {}) {
     progress: 100,
     message: snapshot.message || "저장된 도안 파일",
     created_at: snapshot.created_at || new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    updated_at: snapshot.updated_at || snapshot.created_at || new Date().toISOString(),
     width: snapshot.width,
     height: snapshot.height,
     used_colors: Array.isArray(snapshot.used_colors) ? snapshot.used_colors : [],
     grid_codes: Array.isArray(snapshot.grid_codes) ? snapshot.grid_codes : [],
-    ui_state: preserveExistingUiState
-      ? buildPortableUiState(snapshot.ui_state)
-      : buildPortableUiState(),
+    canvas_mode: snapshot.canvas_mode === APP_MODES.BOOK ? APP_MODES.BOOK : APP_MODES.SKETCHBOOK,
+    book_selected_segment: snapshot.book_selected_segment || selectedBookSegmentId,
+    book_applied_segments: normalizeBookAppliedSegments(snapshot.book_applied_segments),
+    book_segment_crops: normalizeBookSegmentCrops(snapshot.book_segment_crops),
   };
 }
 
-function buildPortableUiState(existingUiState) {
-  if (existingUiState && typeof existingUiState === "object") {
-    return {
-      completed_cells: sanitizeCompletedCells(existingUiState.completed_cells),
-      multi_select_enabled: Boolean(existingUiState.multi_select_enabled),
-      active_color_code: typeof existingUiState.active_color_code === "string" ? existingUiState.active_color_code : null,
-      active_color_codes: Array.isArray(existingUiState.active_color_codes)
-        ? existingUiState.active_color_codes.filter((code) => typeof code === "string")
-        : [],
-      remembered_multi_color_codes: Array.isArray(existingUiState.remembered_multi_color_codes)
-        ? existingUiState.remembered_multi_color_codes.filter((code) => typeof code === "string")
-        : [],
-    };
+function createDefaultModeUiState() {
+  return {
+    activeColorCode: null,
+    activeColorCodes: [],
+    completedCells: [],
+    palettePage: 0,
+    activeGroup: null,
+    multiSelectEnabled: false,
+    rememberedMultiColorCodes: [],
+  };
+}
+
+function normalizeModeUiState(state) {
+  if (!state || typeof state !== "object") {
+    return createDefaultModeUiState();
   }
 
   return {
-    completed_cells: [...viewerState.completedCells],
-    multi_select_enabled: paletteState.multiSelectEnabled,
-    active_color_code: viewerState.activeColorCode,
-    active_color_codes: [...getActivePaletteCodes()],
-    remembered_multi_color_codes: [...paletteState.rememberedMultiColorCodes],
+    activeColorCode: typeof state.activeColorCode === "string" && state.activeColorCode.trim()
+      ? state.activeColorCode.trim()
+      : null,
+    activeColorCodes: Array.isArray(state.activeColorCodes)
+      ? [...new Set(state.activeColorCodes.filter((code) => typeof code === "string" && code.trim()).map((code) => code.trim()))]
+      : [],
+    completedCells: Array.isArray(state.completedCells)
+      ? [...new Set(state.completedCells.filter((key) => typeof key === "string" && key.includes(":")))]
+      : [],
+    palettePage: Number.isFinite(state.palettePage) ? state.palettePage : 0,
+    activeGroup: typeof state.activeGroup === "string" && state.activeGroup.trim()
+      ? state.activeGroup.trim()
+      : null,
+    multiSelectEnabled: Boolean(state.multiSelectEnabled),
+    rememberedMultiColorCodes: Array.isArray(state.rememberedMultiColorCodes)
+      ? [...new Set(state.rememberedMultiColorCodes.filter((code) => typeof code === "string" && code.trim()).map((code) => code.trim()))]
+      : [],
   };
 }
 
-function sanitizeCompletedCells(entries) {
-  if (!Array.isArray(entries)) {
-    return [];
+function getSnapshotUiKey(snapshot) {
+  if (!isPortableSnapshot(snapshot)) {
+    return null;
   }
 
-  return entries.filter((entry) => typeof entry === "string" && /^\d+:\d+$/.test(entry));
+  const mode = snapshot.canvas_mode === APP_MODES.BOOK ? APP_MODES.BOOK : APP_MODES.SKETCHBOOK;
+  return `${mode}|${snapshot.job_id || ""}|${snapshot.filename || ""}|${snapshot.width || 0}x${snapshot.height || 0}`;
+}
+
+function captureCurrentModeUiState() {
+  return normalizeModeUiState({
+    activeColorCode: viewerState.activeColorCode || null,
+    activeColorCodes: [...getActivePaletteCodes()],
+    completedCells: [...viewerState.completedCells],
+    palettePage: Number.isFinite(paletteState.page) ? paletteState.page : 0,
+    activeGroup: paletteState.activeGroup || null,
+    multiSelectEnabled: Boolean(paletteState.multiSelectEnabled),
+    rememberedMultiColorCodes: [...paletteState.rememberedMultiColorCodes],
+  });
+}
+
+function persistCurrentModeUiState() {
+  const snapshotKey = getSnapshotUiKey(currentResultSnapshot);
+  if (!snapshotKey) {
+    return;
+  }
+
+  const modeKey = currentResultSnapshot.canvas_mode === APP_MODES.BOOK ? APP_MODES.BOOK : APP_MODES.SKETCHBOOK;
+  modeUiStates[modeKey] = {
+    snapshotKey,
+    state: captureCurrentModeUiState(),
+  };
+}
+
+function restoreModeUiStateForSnapshot(snapshot) {
+  const snapshotKey = getSnapshotUiKey(snapshot);
+  if (!snapshotKey) {
+    return;
+  }
+
+  const modeKey = snapshot.canvas_mode === APP_MODES.BOOK ? APP_MODES.BOOK : APP_MODES.SKETCHBOOK;
+  const stored = modeUiStates[modeKey];
+  const nextState = stored?.snapshotKey === snapshotKey ? stored.state : createDefaultModeUiState();
+  const validCodes = new Set(viewerState.paletteByCode.keys());
+  const filteredCodes = [...new Set((nextState.activeColorCodes || []).filter((code) => validCodes.has(code)))];
+  const primaryCode = nextState.activeColorCode && validCodes.has(nextState.activeColorCode)
+    ? nextState.activeColorCode
+    : filteredCodes[filteredCodes.length - 1] || null;
+
+  paletteState.multiSelectEnabled = Boolean(nextState.multiSelectEnabled);
+  paletteState.rememberedMultiColorCodes = (nextState.rememberedMultiColorCodes || []).filter((code) => validCodes.has(code));
+  viewerState.activeColorCode = primaryCode;
+  viewerState.activeColorCodes = paletteState.multiSelectEnabled
+    ? filteredCodes
+    : primaryCode ? [primaryCode] : [];
+
+  const activeGroupExists = paletteState.groups.some((group) => group.name === nextState.activeGroup);
+  paletteState.activeGroup = activeGroupExists
+    ? nextState.activeGroup
+    : getPaletteGroupNameByCode(viewerState.activeColorCode) || paletteState.groups[0]?.name || null;
+
+  const pageCount = Math.max(1, Math.ceil(paletteState.groups.length / 5));
+  paletteState.page = clamp(Number.isFinite(nextState.palettePage) ? nextState.palettePage : 0, 0, pageCount - 1);
+  if (!paletteState.groups.slice(paletteState.page * 5, (paletteState.page * 5) + 5).some((group) => group.name === paletteState.activeGroup)) {
+    ensurePalettePageForActiveGroup();
+  }
+
+  viewerState.completedCells = new Set((nextState.completedCells || []).filter((key) => {
+    if (typeof key !== "string") {
+      return false;
+    }
+    const [rowToken, columnToken] = key.split(":");
+    const row = Number(rowToken);
+    const column = Number(columnToken);
+    return Number.isInteger(row)
+      && Number.isInteger(column)
+      && row >= 0
+      && column >= 0
+      && row < viewerState.rows
+      && column < viewerState.columns;
+  }));
+
+  renderPaletteGroups();
+  renderPaletteDetails();
+  updatePaletteFilterUi();
+  drawGuideCanvas();
+  updateViewerNote();
+  updateViewerDetail();
 }
 
 function extractPortableSnapshot(payload) {
@@ -896,12 +1969,69 @@ function extractPortableSnapshot(payload) {
   return payload.grid_codes ? payload : null;
 }
 
+function extractSavedUiState(payload) {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  return normalizeModeUiState(payload.ui_state);
+}
+
+function primeModeUiStateForSnapshot(snapshot, uiState) {
+  if (!isPortableSnapshot(snapshot)) {
+    return;
+  }
+
+  const snapshotKey = getSnapshotUiKey(snapshot);
+  if (!snapshotKey) {
+    return;
+  }
+
+  const modeKey = snapshot.canvas_mode === APP_MODES.BOOK ? APP_MODES.BOOK : APP_MODES.SKETCHBOOK;
+  modeUiStates[modeKey] = {
+    snapshotKey,
+    state: normalizeModeUiState(uiState),
+  };
+}
+
+function persistCurrentSnapshotByMode() {
+  if (!isPortableSnapshot(currentResultSnapshot)) {
+    return;
+  }
+
+  const portableSnapshot = buildPortableSnapshot(currentResultSnapshot);
+  if (portableSnapshot.canvas_mode === APP_MODES.BOOK) {
+    bookSnapshot = portableSnapshot;
+    return;
+  }
+  sketchbookSnapshot = portableSnapshot;
+}
+
+function applyModeSnapshot(snapshot) {
+  if (!isPortableSnapshot(snapshot)) {
+    return;
+  }
+
+  const portableSnapshot = buildPortableSnapshot(snapshot);
+  currentResultSnapshot = portableSnapshot;
+  if (portableSnapshot.canvas_mode === APP_MODES.BOOK) {
+    selectedBookSegmentId = portableSnapshot.book_selected_segment || selectedBookSegmentId;
+    bookSnapshot = portableSnapshot;
+  } else {
+    sketchbookSnapshot = portableSnapshot;
+  }
+  submitButton.disabled = false;
+  applyModeUi();
+  renderCompleted(currentResultSnapshot);
+  updateSaveButtonState(true);
+}
+
 function isPortableSnapshot(snapshot) {
   return Boolean(
     snapshot
-      && Array.isArray(snapshot.grid_codes)
-      && snapshot.grid_codes.length > 0
-      && Array.isArray(snapshot.used_colors),
+    && Array.isArray(snapshot.grid_codes)
+    && snapshot.grid_codes.length > 0
+    && Array.isArray(snapshot.used_colors),
   );
 }
 
@@ -911,61 +2041,16 @@ function applyImportedConversion(snapshot, sourceName) {
   }
 
   stopTracking();
-  currentResultSnapshot = buildPortableSnapshot(snapshot, { preserveExistingUiState: true });
-  submitButton.disabled = false;
+  persistCurrentSnapshotByMode();
+  persistCurrentModeUiState();
+  const portableSnapshot = buildPortableSnapshot(snapshot);
+  activeMode = portableSnapshot.canvas_mode === APP_MODES.BOOK ? APP_MODES.BOOK : APP_MODES.SKETCHBOOK;
+  applyModeSnapshot(portableSnapshot);
   setStatus("저장본 불러옴", `"${sourceName}" 파일을 불러왔습니다.`, 100);
-  renderCompleted(currentResultSnapshot);
-  restoreImportedUiState(currentResultSnapshot.ui_state);
-  updateSaveButtonState(true);
   if (savedStatus) {
     savedStatus.hidden = true;
     savedStatus.textContent = "";
   }
-}
-
-function restoreImportedUiState(uiState) {
-  if (!uiState || typeof uiState !== "object") {
-    return;
-  }
-
-  const validCodes = new Set(viewerState.paletteByCode.keys());
-  const activeCodes = Array.isArray(uiState.active_color_codes)
-    ? uiState.active_color_codes.filter((code) => validCodes.has(code))
-    : [];
-  const rememberedCodes = Array.isArray(uiState.remembered_multi_color_codes)
-    ? uiState.remembered_multi_color_codes.filter((code) => validCodes.has(code))
-    : [];
-  const activeCode = typeof uiState.active_color_code === "string" && validCodes.has(uiState.active_color_code)
-    ? uiState.active_color_code
-    : activeCodes[activeCodes.length - 1] || null;
-
-  viewerState.completedCells = new Set(
-    sanitizeCompletedCells(uiState.completed_cells).filter((entry) => {
-      const [rowText, columnText] = entry.split(":");
-      const row = Number(rowText);
-      const column = Number(columnText);
-      return row >= 0
-        && column >= 0
-        && row < viewerState.rows
-        && column < viewerState.columns;
-    }),
-  );
-  paletteState.multiSelectEnabled = Boolean(uiState.multi_select_enabled);
-  viewerState.activeColorCodes = activeCodes;
-  viewerState.activeColorCode = activeCode;
-  paletteState.rememberedMultiColorCodes = rememberedCodes;
-
-  if (viewerState.activeColorCode) {
-    paletteState.activeGroup = getPaletteGroupNameByCode(viewerState.activeColorCode);
-  }
-
-  ensurePalettePageForActiveGroup();
-  renderPaletteGroups();
-  renderPaletteDetails();
-  updatePaletteFilterUi();
-  drawGuideCanvas();
-  updateViewerNote();
-  updateViewerDetail();
 }
 
 function triggerFileDownload(blob, filename) {
@@ -983,9 +2068,44 @@ function triggerFileDownload(blob, filename) {
 function handleSnapshot(snapshot) {
   setStatus(formatStatus(snapshot.status), snapshot.message, snapshot.progress);
   if (snapshot.status === "completed") {
-    currentResultSnapshot = snapshot;
-    updateSaveButtonState(true);
-    renderCompleted(snapshot);
+    if (pendingConversionContext.mode === APP_MODES.BOOK) {
+      const baseGridCodes = bookSnapshot?.grid_codes?.length
+        ? cloneGridCodes(bookSnapshot.grid_codes)
+        : createEmptyGridCodes(BOOK_LAYOUT.width, BOOK_LAYOUT.height, "");
+      const nextAppliedSegments = normalizeBookAppliedSegments([
+        ...(bookSnapshot?.book_applied_segments || []),
+        pendingConversionContext.bookSegmentId,
+      ]);
+      const nextSegmentCrops = {
+        ...normalizeBookSegmentCrops(bookSnapshot?.book_segment_crops || currentResultSnapshot?.book_segment_crops),
+      };
+      const currentSegmentCrop = pendingConversionContext.bookSegmentCrop || buildCurrentBookSegmentCrop();
+      if (pendingConversionContext.bookSegmentId && currentSegmentCrop) {
+        nextSegmentCrops[pendingConversionContext.bookSegmentId] = currentSegmentCrop;
+      }
+      const mergedGridCodes = mergeBookSegmentIntoGrid(baseGridCodes, pendingConversionContext.bookSegmentId, snapshot.grid_codes);
+      bookSnapshot = buildBookSnapshotFromGrid(
+        mergedGridCodes,
+        selectedFile?.name || snapshot.filename,
+        nextAppliedSegments,
+        nextSegmentCrops,
+      );
+      if (activeMode === APP_MODES.BOOK) {
+        currentResultSnapshot = bookSnapshot;
+      }
+    } else {
+      sketchbookSnapshot = buildPortableSnapshot({
+        ...snapshot,
+        canvas_mode: APP_MODES.SKETCHBOOK,
+      });
+      if (activeMode === APP_MODES.SKETCHBOOK) {
+        currentResultSnapshot = sketchbookSnapshot;
+      }
+    }
+    updateSaveButtonState(pendingConversionContext.mode === activeMode && Boolean(currentResultSnapshot));
+    if (pendingConversionContext.mode === activeMode && currentResultSnapshot) {
+      renderCompleted(currentResultSnapshot);
+    }
     finishTracking();
     return;
   }
@@ -1001,14 +2121,23 @@ function startPolling(jobId) {
 }
 
 function stopPolling() {
+  pollingHandle = null;
 }
 
 function stopTracking() {
   stopPolling();
+  if (activeSocket) {
+    activeSocket.close();
+    activeSocket = null;
+  }
+  activeJobId = null;
+  pendingConversionContext = { mode: activeMode, bookSegmentId: null, bookSegmentCrop: null };
 }
 
 function finishTracking() {
   stopPolling();
+  activeJobId = null;
+  pendingConversionContext = { mode: activeMode, bookSegmentId: null, bookSegmentCrop: null };
   submitButton.disabled = false;
 }
 
@@ -1030,6 +2159,9 @@ function renderCompleted(snapshot) {
 
   renderPalette(snapshot.used_colors || []);
   loadGuideGrid(snapshot.grid_codes, snapshot.used_colors || []);
+  restoreModeUiStateForSnapshot(snapshot);
+  setPaletteVisibility((snapshot.used_colors || []).length > 0);
+  renderBookCropOverlays();
   scheduleGuideViewportFit();
 }
 
@@ -1073,11 +2205,13 @@ function renderError(message) {
   }
   prepareGuideViewer(message);
   renderPalette([]);
+  setPaletteVisibility(false);
 }
 
-function resetResultArea(message = "첫 실행은 Python 엔진과 Pillow를 브라우저에 불러오느라 조금 느릴 수 있습니다.") {
+function resetResultArea(message = "도안 생성 후 여기서 바로 확대하고 이동할 수 있습니다.") {
   prepareGuideViewer(message);
   renderPalette([]);
+  setPaletteVisibility(false);
 }
 
 function prepareGuideViewer(message) {
@@ -1484,7 +2618,13 @@ function drawGuideCanvas() {
     }
   }
 
+  if (isBookCanvasMode()) {
+    drawBookOverlay(cellSize, startRow, endRow);
+  }
   drawGuideGridLines(startColumn, endColumn, startRow, endRow, cellSize, size.width, size.height);
+  if (isBookCanvasMode()) {
+    drawBookBoundaryLines(cellSize, startRow, endRow);
+  }
   drawHoveredCell(cellSize);
 }
 
@@ -1524,6 +2664,66 @@ function drawHoveredCell(cellSize) {
   guideContext.restore();
 }
 
+function isBookCanvasMode() {
+  return activeMode === APP_MODES.BOOK;
+}
+
+function drawBookOverlay(cellSize, startRow, endRow) {
+  const gridTop = viewerState.panY + (startRow * cellSize);
+  const gridHeight = Math.max(0, (endRow - startRow) * cellSize);
+  if (gridHeight <= 0) {
+    return;
+  }
+
+  const leftBlockedWidth = BOOK_LAYOUT.blockedColumns * cellSize;
+  const fadedWidth = BOOK_LAYOUT.fadedColumns * cellSize;
+  const spine = getBookSegment("spine");
+  const spineX = viewerState.panX + (spine.startColumn * cellSize);
+  const leftBlockedX = viewerState.panX;
+  const rightBlockedX = viewerState.panX + ((BOOK_LAYOUT.width - BOOK_LAYOUT.blockedColumns) * cellSize);
+  const leftFadedX = viewerState.panX + (BOOK_LAYOUT.blockedColumns * cellSize);
+  const rightFadedX = viewerState.panX + ((BOOK_LAYOUT.width - BOOK_LAYOUT.blockedColumns - BOOK_LAYOUT.fadedColumns) * cellSize);
+
+  guideContext.save();
+  guideContext.fillStyle = "rgba(183, 54, 54, .16)";
+  guideContext.fillRect(leftBlockedX, gridTop, leftBlockedWidth, gridHeight);
+  guideContext.fillRect(rightBlockedX, gridTop, leftBlockedWidth, gridHeight);
+
+  guideContext.fillStyle = "rgba(255, 255, 255, .24)";
+  guideContext.fillRect(leftFadedX, gridTop, fadedWidth, gridHeight);
+  guideContext.fillRect(rightFadedX, gridTop, fadedWidth, gridHeight);
+
+  guideContext.fillStyle = "rgba(112, 84, 62, .14)";
+  guideContext.fillRect(spineX, gridTop, spine.width * cellSize, gridHeight);
+  guideContext.restore();
+
+}
+
+function drawBookBoundaryLines(cellSize, startRow, endRow) {
+  const y1 = viewerState.panY + (startRow * cellSize);
+  const y2 = viewerState.panY + (endRow * cellSize);
+  const boundaryColumns = [
+    BOOK_LAYOUT.blockedColumns,
+    BOOK_LAYOUT.blockedColumns + BOOK_LAYOUT.fadedColumns,
+    BOOK_LAYOUT.segments.spine.startColumn,
+    BOOK_LAYOUT.segments.spine.startColumn + BOOK_LAYOUT.segments.spine.width,
+    BOOK_LAYOUT.width - BOOK_LAYOUT.blockedColumns - BOOK_LAYOUT.fadedColumns,
+    BOOK_LAYOUT.width - BOOK_LAYOUT.blockedColumns,
+  ];
+
+  guideContext.save();
+  for (const column of boundaryColumns) {
+    const x = viewerState.panX + (column * cellSize);
+    guideContext.beginPath();
+    guideContext.moveTo(x, y1);
+    guideContext.lineTo(x, y2);
+    guideContext.lineWidth = Math.max(2, cellSize * 0.1);
+    guideContext.strokeStyle = "rgba(96, 68, 51, .62)";
+    guideContext.stroke();
+  }
+  guideContext.restore();
+}
+
 function getCellFromClientPoint(clientX, clientY) {
   if (!guideViewport || !viewerState.rows || !viewerState.columns) {
     return null;
@@ -1538,16 +2738,15 @@ function getCellFromClientPoint(clientX, clientY) {
   if (column < 0 || row < 0 || column >= viewerState.columns || row >= viewerState.rows) {
     return null;
   }
+  if (isBookCanvasMode() && isBookBlockedColumn(column)) {
+    return null;
+  }
 
   return { column, row };
 }
 
 function getCellKey(cell) {
-  if (!cell) {
-    return null;
-  }
-
-  return `${cell.row}:${cell.column}`;
+  return cell ? `${cell.row}:${cell.column}` : null;
 }
 
 function isCellCompleted(cell) {
@@ -1556,7 +2755,7 @@ function isCellCompleted(cell) {
 }
 
 function setCompletedStateForCell(cell, nextCompleted = null) {
-  if (!viewerState.rows || !viewerState.columns || !cell) {
+  if (!cell) {
     return false;
   }
 
@@ -1592,6 +2791,10 @@ function syncCompletedCellUi() {
   updatePaletteFilterUi();
   updateViewerNote();
   updateViewerDetail();
+}
+
+function isBookBlockedColumn(column) {
+  return column < BOOK_LAYOUT.blockedColumns || column >= BOOK_LAYOUT.width - BOOK_LAYOUT.blockedColumns;
 }
 
 function toggleCompletedCellFromClientPoint(clientX, clientY) {
@@ -1633,17 +2836,30 @@ function updateViewerNote() {
     return;
   }
 
+  const activeCode = viewerState.activeColorCode;
+  if (isBookCanvasMode()) {
+    const segment = getBookSegment(selectedBookSegmentId);
+    const appliedCount = normalizeBookAppliedSegments(currentResultSnapshot?.book_applied_segments || []).length;
+    if (activeCode) {
+      const color = viewerState.paletteByCode.get(activeCode);
+      viewerNote.textContent = `현재 선택 범위: ${segment.label} · 적용한 구역 ${appliedCount}개\n현재 ${color?.code || activeCode}${getActiveColorProgressText()}`;
+      return;
+    }
+
+    viewerNote.textContent = `현재 선택 범위: ${segment.label} · 적용한 구역 ${appliedCount}개`;
+    return;
+  }
+
   const activeColorCodes = getActivePaletteCodes();
   const activeColorProgress = getActiveColorProgressText();
-  const spacer = "\u00A0\u00A0";
   if (activeColorCodes.length > 1 && viewerState.activeColorCode) {
-    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요.\n${activeColorCodes.length}색 표시 중${spacer}현재 ${viewerState.activeColorCode}${activeColorProgress}\n좌클릭으로 토글하고, 휠 버튼을 누른 채 지나가면 연속 체크 또는 해제됩니다.`;
+    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요.\n${activeColorCodes.length}색 표시 중 · 현재 ${viewerState.activeColorCode}${activeColorProgress}\n클릭으로 체크하고, 휠 버튼을 누른 채 지나가면 연속 체크할 수 있습니다.`;
     return;
   }
 
   if (viewerState.activeColorCode) {
     const color = viewerState.paletteByCode.get(viewerState.activeColorCode);
-    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요.\n현재 ${color?.code || viewerState.activeColorCode}${activeColorProgress}\n좌클릭으로 토글하고, 휠 버튼을 누른 채 지나가면 연속 체크 또는 해제됩니다.`;
+    viewerNote.textContent = `마우스 휠이나 버튼으로 확대하고, 드래그로 이동하세요.\n현재 ${color?.code || viewerState.activeColorCode}${activeColorProgress}\n클릭으로 체크하고, 휠 버튼을 누른 채 지나가면 연속 체크할 수 있습니다.`;
     return;
   }
 
@@ -1660,13 +2876,12 @@ function getActiveColorProgressText() {
   }
 
   const totalCount = getTotalCountForCode(activeCode);
-  const remainingCount = getRemainingCountForCode(activeCode);
-
+  const completedCount = countCompletedCellsForCode(activeCode);
   if (totalCount <= 0) {
     return "";
   }
 
-  return `\u00A0\u00A0${totalCount}칸 중 ${remainingCount}칸 남음`;
+  return ` · 총 ${totalCount}칸 중 ${completedCount}칸 완료`;
 }
 
 function countCompletedCellsForCode(targetCode) {
@@ -1709,12 +2924,14 @@ function completeActiveColorCells() {
 
   const shouldComplete = !isCodeCompleted(activeCode);
   let changed = false;
+
   for (let row = 0; row < viewerState.rows; row += 1) {
     const gridRow = viewerState.gridCodes[row];
     for (let column = 0; column < viewerState.columns; column += 1) {
       if (gridRow[column] !== activeCode) {
         continue;
       }
+
       const key = `${row}:${column}`;
       if (shouldComplete && !viewerState.completedCells.has(key)) {
         viewerState.completedCells.add(key);
@@ -1726,15 +2943,9 @@ function completeActiveColorCells() {
     }
   }
 
-  if (!changed) {
-    return;
+  if (changed) {
+    syncCompletedCellUi();
   }
-
-  drawGuideCanvas();
-  renderPaletteDetails();
-  updatePaletteFilterUi();
-  updateViewerNote();
-  updateViewerDetail();
 }
 
 function togglePaletteMultiSelect() {
@@ -1747,31 +2958,19 @@ function togglePaletteMultiSelect() {
     viewerState.activeColorCode = null;
   } else {
     paletteState.multiSelectEnabled = true;
-    if (getActivePaletteCodes().length === 0 && paletteState.rememberedMultiColorCodes.length > 0) {
-      const restoredCodes = paletteState.rememberedMultiColorCodes.filter((code) => viewerState.paletteByCode.has(code));
+    const restoredCodes = paletteState.rememberedMultiColorCodes.filter((code) => viewerState.paletteByCode.has(code));
+    if (restoredCodes.length > 0) {
       viewerState.activeColorCodes = [...restoredCodes];
-      viewerState.activeColorCode = restoredCodes[restoredCodes.length - 1] || null;
+      viewerState.activeColorCode = restoredCodes.includes(viewerState.activeColorCode)
+        ? viewerState.activeColorCode
+        : restoredCodes[restoredCodes.length - 1] || null;
+    } else if (viewerState.activeColorCode && viewerState.paletteByCode.has(viewerState.activeColorCode)) {
+      viewerState.activeColorCodes = [viewerState.activeColorCode];
+    } else {
+      viewerState.activeColorCodes = [];
+      viewerState.activeColorCode = null;
     }
   }
-
-  renderPaletteGroups();
-  renderPaletteDetails();
-  updatePaletteFilterUi();
-
-  if (viewerState.rows && viewerState.columns) {
-    drawGuideCanvas();
-    updateViewerNote();
-    updateViewerDetail();
-  }
-}
-
-function resetPaletteFilter() {
-  if (getActivePaletteCodes().length > 0) {
-    paletteState.rememberedMultiColorCodes = [...getActivePaletteCodes()];
-  }
-  paletteState.multiSelectEnabled = false;
-  viewerState.activeColorCodes = [];
-  viewerState.activeColorCode = null;
 
   renderPaletteGroups();
   renderPaletteDetails();
@@ -1872,7 +3071,7 @@ function updatePaletteFilterUi() {
   }
 
   if (paletteModeIndicator) {
-    paletteModeIndicator.textContent = paletteState.multiSelectEnabled ? "멀티모드" : "원본";
+    paletteModeIndicator.textContent = paletteState.multiSelectEnabled ? "멀티모드" : "원본모드";
     paletteModeIndicator.classList.toggle("is-multi", paletteState.multiSelectEnabled);
   }
 
@@ -2113,24 +3312,7 @@ function mixHexColors(baseHex, overlayHex, overlayWeight = 0.5) {
 }
 
 function hexToRgb(hexValue) {
-  if (typeof hexValue !== "string") {
-    return [255, 255, 255];
-  }
-
-  const normalized = hexValue.trim();
-  if (normalized.startsWith("rgb")) {
-    const matches = normalized.match(/\d+(?:\.\d+)?/g);
-    if (matches && matches.length >= 3) {
-      return matches.slice(0, 3).map((value) => Math.round(Number(value)));
-    }
-    return [255, 255, 255];
-  }
-
-  const clean = normalized.replace("#", "");
-  if (clean.length !== 6) {
-    return [255, 255, 255];
-  }
-
+  const clean = hexValue.replace("#", "");
   return [0, 2, 4].map((index) => Number.parseInt(clean.slice(index, index + 2), 16));
 }
 
@@ -2154,8 +3336,8 @@ function handleWindowResize() {
   const layoutModeChanged = nextViewportLayoutMode !== lastViewportLayoutMode;
   lastViewportLayoutMode = nextViewportLayoutMode;
 
-  if (cropSelection) {
-    renderCropSelection();
+  if (cropSelection || expandedCropSelection) {
+    scheduleCropLayoutRefresh();
   }
   if (viewerState.rows && viewerState.columns) {
     if (layoutModeChanged) {
@@ -2182,8 +3364,20 @@ function renderSelectedFile() {
 }
 
 function getTargetCropRatio() {
+  if (activeMode === APP_MODES.BOOK) {
+    const segment = getBookSegment(selectedBookSegmentId);
+    return segment.width / BOOK_LAYOUT.height;
+  }
   const [width, height] = ratioInput.value.split(":").map(Number);
   return width > 0 && height > 0 ? width / height : 1;
+}
+
+function getTargetCropRatioLabel() {
+  if (activeMode === APP_MODES.BOOK) {
+    const segment = getBookSegment(selectedBookSegmentId);
+    return `${segment.width}:${BOOK_LAYOUT.height}`;
+  }
+  return ratioInput.value;
 }
 
 function preventDefault(event) {

@@ -17,3 +17,20 @@ def get_preset(ratio: str, precision: int) -> tuple[int, int]:
         raise ValueError(f"Unsupported precision: {precision}")
 
     return size
+
+
+def get_custom_preset(
+    ratio: str,
+    precision: int,
+    width: int | None = None,
+    height: int | None = None,
+) -> tuple[int, int]:
+    if width is None and height is None:
+        return get_preset(ratio, precision)
+    if width is None or height is None:
+        raise ValueError("Canvas width and height must be provided together.")
+    if width <= 0 or height <= 0:
+        raise ValueError("Canvas width and height must be positive integers.")
+    if width > 300 or height > 300:
+        raise ValueError("Canvas width and height must be 300 or smaller.")
+    return int(width), int(height)
