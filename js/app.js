@@ -2753,21 +2753,23 @@ function drawGuideGridLines(startColumn, endColumn, startRow, endRow, cellSize, 
   const baseGridLineColor = rgbaFromHexColor(guideGridColor, 0.18);
   for (let column = startColumn; column <= endColumn; column += 1) {
     const x = viewerState.panX + (column * cellSize);
+    const isStrongLine = column > 0 && (column + 1) % 5 === 0;
     guideContext.beginPath();
     guideContext.moveTo(x, Math.max(0, viewerState.panY + (startRow * cellSize)));
     guideContext.lineTo(x, Math.min(viewportHeight, viewerState.panY + (endRow * cellSize)));
-    guideContext.lineWidth = column % 5 === 0 ? Math.max(1.5, cellSize * 0.08) : 1;
-    guideContext.strokeStyle = column % 5 === 0 ? strongGridLineColor : baseGridLineColor;
+    guideContext.lineWidth = isStrongLine ? Math.max(1.5, cellSize * 0.08) : 1;
+    guideContext.strokeStyle = isStrongLine ? strongGridLineColor : baseGridLineColor;
     guideContext.stroke();
   }
 
   for (let row = startRow; row <= endRow; row += 1) {
     const y = viewerState.panY + (row * cellSize);
+    const isStrongLine = row > 0 && (row + 1) % 5 === 0;
     guideContext.beginPath();
     guideContext.moveTo(Math.max(0, viewerState.panX + (startColumn * cellSize)), y);
     guideContext.lineTo(Math.min(viewportWidth, viewerState.panX + (endColumn * cellSize)), y);
-    guideContext.lineWidth = row % 5 === 0 ? Math.max(1.5, cellSize * 0.08) : 1;
-    guideContext.strokeStyle = row % 5 === 0 ? strongGridLineColor : baseGridLineColor;
+    guideContext.lineWidth = isStrongLine ? Math.max(1.5, cellSize * 0.08) : 1;
+    guideContext.strokeStyle = isStrongLine ? strongGridLineColor : baseGridLineColor;
     guideContext.stroke();
   }
 }
