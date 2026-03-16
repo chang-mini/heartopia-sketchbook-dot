@@ -2753,7 +2753,7 @@ function drawGuideGridLines(startColumn, endColumn, startRow, endRow, cellSize, 
   const baseGridLineColor = rgbaFromHexColor(guideGridColor, 0.18);
   for (let column = startColumn; column <= endColumn; column += 1) {
     const x = viewerState.panX + (column * cellSize);
-    const isStrongLine = column > 0 && (column + 1) % 5 === 0;
+    const isStrongLine = column > 0 && column % 5 === 0;
     guideContext.beginPath();
     guideContext.moveTo(x, Math.max(0, viewerState.panY + (startRow * cellSize)));
     guideContext.lineTo(x, Math.min(viewportHeight, viewerState.panY + (endRow * cellSize)));
