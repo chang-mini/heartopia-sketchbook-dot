@@ -66,41 +66,61 @@ const APP_MODES = {
   BOOK: "book",
 };
 
-const BOOK_LAYOUT = {
-  width: 150,
-  height: 84,
-  ratio: "16:9",
-  precision: 4,
-  blockedColumns: 5,
-  fadedColumns: 2,
-  spineColumns: 8,
-  segments: {
-    full: {
-      id: "full",
-      label: "전체",
-      startColumn: 5,
-      width: 140,
+const BOOK_LAYOUT = (() => {
+  const width = 150;
+  const height = 84;
+  const topBlockedRows = 1;
+  const leftBlockedColumns = 5;
+  const rightBlockedColumns = 6;
+  const fadedColumns = 2;
+  const spineLeftColumns = 8;
+  const spineRightColumns = 7;
+  const usableHeight = height - topBlockedRows;
+  const fullWidth = width - leftBlockedColumns - rightBlockedColumns;
+  const spineWidth = spineLeftColumns + spineRightColumns;
+  const coverWidth = Math.floor((fullWidth - spineWidth) / 2);
+  const spineStartColumn = leftBlockedColumns + coverWidth;
+
+  return {
+    width,
+    height,
+    ratio: "16:9",
+    precision: 4,
+    topBlockedRows,
+    leftBlockedColumns,
+    rightBlockedColumns,
+    fadedColumns,
+    spineLeftColumns,
+    spineRightColumns,
+    usableHeight,
+    segments: {
+      full: {
+        id: "full",
+        label: "전체",
+        startColumn: leftBlockedColumns,
+        width: fullWidth,
+      },
+      back_cover: {
+        id: "back_cover",
+        label: "뒷면표지",
+        startColumn: leftBlockedColumns,
+        width: coverWidth,
+      },
+      spine: {
+        id: "spine",
+        label: "책등",
+        startColumn: spineStartColumn,
+        width: spineWidth,
+      },
+      front_cover: {
+        id: "front_cover",
+        label: "앞면표지",
+        startColumn: spineStartColumn + spineWidth,
+        width: coverWidth,
+      },
     },
-    back_cover: {
-      id: "back_cover",
-      label: "뒷면표지",
-      startColumn: 5,
-      width: 66,
-    },
-    spine: {
-      id: "spine",
-      label: "책등",
-      startColumn: 71,
-      width: 8,
-    },
-    front_cover: {
-      id: "front_cover",
-      label: "앞면표지",
-      startColumn: 79,
-      width: 66,
-    },
-  },
-};
+  };
+})();
 
 const viewerState = {
   gridCodes: [],
@@ -558,9 +578,10 @@ function buildUsedColorsFromGrid(gridCodes) {
 function mergeBookSegmentIntoGrid(baseGridCodes, segmentId, segmentGridCodes) {
   const segment = getBookSegment(segmentId);
   const nextGridCodes = cloneGridCodes(baseGridCodes);
-  for (let row = 0; row < BOOK_LAYOUT.height; row += 1) {
+  for (let row = 0; row < BOOK_LAYOUT.usableHeight; row += 1) {
+    const targetRow = BOOK_LAYOUT.topBlockedRows + row;
     for (let offset = 0; offset < segment.width; offset += 1) {
-      nextGridCodes[row][segment.startColumn + offset] = segmentGridCodes[row]?.[offset] || "";
+      nextGridCodes[targetRow][segment.startColumn + offset] = segmentGridCodes[row]?.[offset] || "";
     }
   }
   return nextGridCodes;
@@ -820,7 +841,7 @@ async function startConversion(event) {
     if (activeMode === APP_MODES.BOOK) {
       const bookSegment = getBookSegment(selectedBookSegmentId);
       canvasWidth = bookSegment.width;
-      canvasHeight = BOOK_LAYOUT.height;
+      canvasHeight = BOOK_LAYOUT.usableHeight;
     }
     const snapshot = await convertImageLocally({
       file: uploadFile,
@@ -2669,54 +2690,78 @@ function isBookCanvasMode() {
 }
 
 function drawBookOverlay(cellSize, startRow, endRow) {
-  const gridTop = viewerState.panY + (startRow * cellSize);
   const gridHeight = Math.max(0, (endRow - startRow) * cellSize);
   if (gridHeight <= 0) {
     return;
   }
 
-  const leftBlockedWidth = BOOK_LAYOUT.blockedColumns * cellSize;
+  const gridLeft = viewerState.panX;
+  const gridWidth = BOOK_LAYOUT.width * cellSize;
+  const topBlockedStartRow = Math.max(startRow, 0);
+  const topBlockedEndRow = Math.min(endRow, BOOK_LAYOUT.topBlockedRows);
+  const topBlockedHeight = Math.max(0, (topBlockedEndRow - topBlockedStartRow) * cellSize);
+  const lowerStartRow = Math.max(startRow, BOOK_LAYOUT.topBlockedRows);
+  const lowerHeight = Math.max(0, (endRow - lowerStartRow) * cellSize);
+  const leftBlockedWidth = BOOK_LAYOUT.leftBlockedColumns * cellSize;
+  const rightBlockedWidth = BOOK_LAYOUT.rightBlockedColumns * cellSize;
   const fadedWidth = BOOK_LAYOUT.fadedColumns * cellSize;
   const spine = getBookSegment("spine");
   const spineX = viewerState.panX + (spine.startColumn * cellSize);
   const leftBlockedX = viewerState.panX;
-  const rightBlockedX = viewerState.panX + ((BOOK_LAYOUT.width - BOOK_LAYOUT.blockedColumns) * cellSize);
-  const leftFadedX = viewerState.panX + (BOOK_LAYOUT.blockedColumns * cellSize);
-  const rightFadedX = viewerState.panX + ((BOOK_LAYOUT.width - BOOK_LAYOUT.blockedColumns - BOOK_LAYOUT.fadedColumns) * cellSize);
+  const rightBlockedX = viewerState.panX + ((BOOK_LAYOUT.width - BOOK_LAYOUT.rightBlockedColumns) * cellSize);
+  const leftFadedX = viewerState.panX + (BOOK_LAYOUT.leftBlockedColumns * cellSize);
+  const rightFadedX = viewerState.panX + ((BOOK_LAYOUT.width - BOOK_LAYOUT.rightBlockedColumns - BOOK_LAYOUT.fadedColumns) * cellSize);
 
   guideContext.save();
-  guideContext.fillStyle = "rgba(183, 54, 54, .16)";
-  guideContext.fillRect(leftBlockedX, gridTop, leftBlockedWidth, gridHeight);
-  guideContext.fillRect(rightBlockedX, gridTop, leftBlockedWidth, gridHeight);
+  if (topBlockedHeight > 0) {
+    guideContext.fillStyle = "rgba(183, 54, 54, .16)";
+    guideContext.fillRect(gridLeft, viewerState.panY + (topBlockedStartRow * cellSize), gridWidth, topBlockedHeight);
+  }
 
-  guideContext.fillStyle = "rgba(255, 255, 255, .24)";
-  guideContext.fillRect(leftFadedX, gridTop, fadedWidth, gridHeight);
-  guideContext.fillRect(rightFadedX, gridTop, fadedWidth, gridHeight);
+  if (lowerHeight > 0) {
+    guideContext.fillStyle = "rgba(183, 54, 54, .16)";
+    guideContext.fillRect(leftBlockedX, viewerState.panY + (lowerStartRow * cellSize), leftBlockedWidth, lowerHeight);
+    guideContext.fillRect(rightBlockedX, viewerState.panY + (lowerStartRow * cellSize), rightBlockedWidth, lowerHeight);
 
-  guideContext.fillStyle = "rgba(112, 84, 62, .14)";
-  guideContext.fillRect(spineX, gridTop, spine.width * cellSize, gridHeight);
+    guideContext.fillStyle = "rgba(255, 255, 255, .24)";
+    guideContext.fillRect(leftFadedX, viewerState.panY + (lowerStartRow * cellSize), fadedWidth, lowerHeight);
+    guideContext.fillRect(rightFadedX, viewerState.panY + (lowerStartRow * cellSize), fadedWidth, lowerHeight);
+
+    guideContext.fillStyle = "rgba(112, 84, 62, .14)";
+    guideContext.fillRect(spineX, viewerState.panY + (lowerStartRow * cellSize), spine.width * cellSize, lowerHeight);
+  }
   guideContext.restore();
-
 }
 
 function drawBookBoundaryLines(cellSize, startRow, endRow) {
-  const y1 = viewerState.panY + (startRow * cellSize);
+  const y1 = viewerState.panY + (Math.max(startRow, BOOK_LAYOUT.topBlockedRows) * cellSize);
   const y2 = viewerState.panY + (endRow * cellSize);
   const boundaryColumns = [
-    BOOK_LAYOUT.blockedColumns,
-    BOOK_LAYOUT.blockedColumns + BOOK_LAYOUT.fadedColumns,
+    BOOK_LAYOUT.leftBlockedColumns,
+    BOOK_LAYOUT.leftBlockedColumns + BOOK_LAYOUT.fadedColumns,
     BOOK_LAYOUT.segments.spine.startColumn,
     BOOK_LAYOUT.segments.spine.startColumn + BOOK_LAYOUT.segments.spine.width,
-    BOOK_LAYOUT.width - BOOK_LAYOUT.blockedColumns - BOOK_LAYOUT.fadedColumns,
-    BOOK_LAYOUT.width - BOOK_LAYOUT.blockedColumns,
+    BOOK_LAYOUT.width - BOOK_LAYOUT.rightBlockedColumns - BOOK_LAYOUT.fadedColumns,
+    BOOK_LAYOUT.width - BOOK_LAYOUT.rightBlockedColumns,
   ];
 
   guideContext.save();
-  for (const column of boundaryColumns) {
-    const x = viewerState.panX + (column * cellSize);
+  if (y2 > y1) {
+    for (const column of boundaryColumns) {
+      const x = viewerState.panX + (column * cellSize);
+      guideContext.beginPath();
+      guideContext.moveTo(x, y1);
+      guideContext.lineTo(x, y2);
+      guideContext.lineWidth = Math.max(2, cellSize * 0.1);
+      guideContext.strokeStyle = "rgba(96, 68, 51, .62)";
+      guideContext.stroke();
+    }
+  }
+  if (startRow <= BOOK_LAYOUT.topBlockedRows && endRow > 0) {
+    const y = viewerState.panY + (BOOK_LAYOUT.topBlockedRows * cellSize);
     guideContext.beginPath();
-    guideContext.moveTo(x, y1);
-    guideContext.lineTo(x, y2);
+    guideContext.moveTo(viewerState.panX, y);
+    guideContext.lineTo(viewerState.panX + (BOOK_LAYOUT.width * cellSize), y);
     guideContext.lineWidth = Math.max(2, cellSize * 0.1);
     guideContext.strokeStyle = "rgba(96, 68, 51, .62)";
     guideContext.stroke();
@@ -2738,7 +2783,7 @@ function getCellFromClientPoint(clientX, clientY) {
   if (column < 0 || row < 0 || column >= viewerState.columns || row >= viewerState.rows) {
     return null;
   }
-  if (isBookCanvasMode() && isBookBlockedColumn(column)) {
+  if (isBookCanvasMode() && (isBookBlockedColumn(column) || isBookBlockedRow(row))) {
     return null;
   }
 
@@ -2793,8 +2838,12 @@ function syncCompletedCellUi() {
   updateViewerDetail();
 }
 
+function isBookBlockedRow(row) {
+  return row < BOOK_LAYOUT.topBlockedRows;
+}
+
 function isBookBlockedColumn(column) {
-  return column < BOOK_LAYOUT.blockedColumns || column >= BOOK_LAYOUT.width - BOOK_LAYOUT.blockedColumns;
+  return column < BOOK_LAYOUT.leftBlockedColumns || column >= BOOK_LAYOUT.width - BOOK_LAYOUT.rightBlockedColumns;
 }
 
 function toggleCompletedCellFromClientPoint(clientX, clientY) {
@@ -3366,7 +3415,7 @@ function renderSelectedFile() {
 function getTargetCropRatio() {
   if (activeMode === APP_MODES.BOOK) {
     const segment = getBookSegment(selectedBookSegmentId);
-    return segment.width / BOOK_LAYOUT.height;
+    return segment.width / BOOK_LAYOUT.usableHeight;
   }
   const [width, height] = ratioInput.value.split(":").map(Number);
   return width > 0 && height > 0 ? width / height : 1;
@@ -3375,7 +3424,7 @@ function getTargetCropRatio() {
 function getTargetCropRatioLabel() {
   if (activeMode === APP_MODES.BOOK) {
     const segment = getBookSegment(selectedBookSegmentId);
-    return `${segment.width}:${BOOK_LAYOUT.height}`;
+    return `${segment.width}:${BOOK_LAYOUT.usableHeight}`;
   }
   return ratioInput.value;
 }
