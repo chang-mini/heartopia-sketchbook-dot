@@ -1009,6 +1009,8 @@
     .viewer-summary {
       display: grid;
       gap: 4px;
+      flex: 1 1 auto;
+      min-width: 0;
     }
 
     #viewer-note {
@@ -1028,7 +1030,19 @@
     .viewer-actions {
       display: flex;
       align-items: center;
+      justify-content: flex-end;
       gap: 10px;
+      flex-wrap: wrap;
+      margin-left: auto;
+      flex: 0 0 auto;
+    }
+
+    .viewer-action-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
     }
 
     .viewer-button {
@@ -1039,6 +1053,132 @@
 
     .viewer-button.wide {
       min-width: 88px;
+    }
+
+    .viewer-grid-color {
+      position: relative;
+    }
+
+    .viewer-color-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 126px;
+      justify-content: center;
+    }
+
+    .viewer-color-chip {
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      background: #5b4736;
+      border: 1px solid rgba(35, 27, 23, .18);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .36);
+      flex: 0 0 auto;
+    }
+
+    .viewer-color-panel {
+      position: absolute;
+      top: calc(100% + 10px);
+      left: 0;
+      z-index: 6;
+      min-width: 200px;
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(35, 27, 23, .1);
+      background: rgba(255, 252, 246, .97);
+      box-shadow: 0 18px 34px rgba(72, 47, 28, .16);
+      display: grid;
+      gap: 12px;
+      backdrop-filter: blur(12px);
+    }
+
+    .viewer-color-panel[hidden] {
+      display: none;
+    }
+
+    .viewer-color-input {
+      display: grid;
+      grid-template-columns: 46px minmax(0, 1fr);
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, .8);
+      border: 1px solid rgba(35, 27, 23, .08);
+    }
+
+    .viewer-color-input input[type="color"] {
+      width: 46px;
+      height: 46px;
+      padding: 0;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .viewer-color-input input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    .viewer-color-input input[type="color"]::-webkit-color-swatch {
+      border: 1px solid rgba(35, 27, 23, .14);
+      border-radius: 12px;
+    }
+
+    .viewer-color-meta {
+      display: grid;
+      gap: 4px;
+    }
+
+    .viewer-color-meta strong {
+      font-size: 14px;
+      letter-spacing: .04em;
+    }
+
+    .viewer-color-meta span {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .viewer-color-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .viewer-color-sample {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted-strong);
+    }
+
+    .viewer-color-sample::before {
+      content: "";
+      width: 36px;
+      height: 10px;
+      border-radius: 999px;
+      background:
+        linear-gradient(90deg, transparent 0 20%, var(--sample-color, #5b4736) 20% 32%, transparent 32% 48%, var(--sample-color, #5b4736) 48% 100%);
+      opacity: .75;
+    }
+
+    .viewer-color-reset {
+      border: 1px solid rgba(35, 27, 23, .12);
+      background: rgba(255, 255, 255, .88);
+      color: var(--muted-strong);
+      padding: 8px 10px;
+      border-radius: 12px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .viewer-color-reset:hover {
+      border-color: rgba(187, 92, 50, .28);
+      color: var(--accent-strong);
     }
 
     .guide-viewport {
@@ -1716,7 +1856,25 @@
 
       .viewer-actions {
         display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
+      }
+
+      .viewer-action-row {
+        display: grid;
+        gap: 10px;
+      }
+
+      .viewer-action-row.primary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .viewer-action-row.zoom {
         grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .viewer-grid-color {
+        width: 100%;
       }
 
       .guide-viewport {
@@ -1849,10 +2007,34 @@
               </div>
             </div>
             <div class="viewer-actions">
-              <button class="viewer-button wide" id="save-current" type="button" disabled>저장</button>
-              <button class="viewer-button" id="zoom-out" type="button" disabled>-</button>
-              <button class="viewer-button wide" id="zoom-reset" type="button" disabled>맞춤</button>
-              <button class="viewer-button" id="zoom-in" type="button" disabled>+</button>
+              <div class="viewer-action-row primary">
+                <div class="viewer-grid-color" id="grid-color-control">
+                  <button class="viewer-button viewer-color-button wide" id="grid-color-toggle" type="button"
+                    aria-expanded="false" aria-controls="grid-color-panel">
+                    <span class="viewer-color-chip" id="grid-color-chip"></span>
+                    <span>그리드색상</span>
+                  </button>
+                  <div class="viewer-color-panel" id="grid-color-panel" hidden>
+                    <label class="viewer-color-input" for="grid-color-input">
+                      <input id="grid-color-input" type="color" value="#5b4736">
+                      <span class="viewer-color-meta">
+                        <strong id="grid-color-value">#5B4736</strong>
+                        <span>작업뷰 셀칸 사이 선 색</span>
+                      </span>
+                    </label>
+                    <div class="viewer-color-foot">
+                      <span class="viewer-color-sample" id="grid-color-sample">미리보기</span>
+                      <button class="viewer-color-reset" id="grid-color-reset" type="button">기본색</button>
+                    </div>
+                  </div>
+                </div>
+                <button class="viewer-button wide" id="save-current" type="button" disabled>저장</button>
+              </div>
+              <div class="viewer-action-row zoom">
+                <button class="viewer-button" id="zoom-out" type="button" disabled>-</button>
+                <button class="viewer-button wide" id="zoom-reset" type="button" disabled>맞춤</button>
+                <button class="viewer-button" id="zoom-in" type="button" disabled>+</button>
+              </div>
             </div>
           </div>
           <div class="guide-viewport" id="guide-viewport">
@@ -1991,7 +2173,7 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.js"></script>
-  <script type="module" src="./js/app.js?v=20260315-githubiotest-3"></script>
+  <script type="module" src="./js/app.js?v=20260316-githubio-4"></script>
 </body>
 
 </html>

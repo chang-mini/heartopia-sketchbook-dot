@@ -32,6 +32,14 @@ const expandedBookSegmentOverlays = document.getElementById("expanded-book-segme
 const statusPill = document.getElementById("status-pill");
 const progressBar = document.getElementById("progress-bar");
 const viewerNote = document.getElementById("viewer-note");
+const gridColorControl = document.getElementById("grid-color-control");
+const gridColorToggleButton = document.getElementById("grid-color-toggle");
+const gridColorPanel = document.getElementById("grid-color-panel");
+const gridColorInput = document.getElementById("grid-color-input");
+const gridColorValue = document.getElementById("grid-color-value");
+const gridColorChip = document.getElementById("grid-color-chip");
+const gridColorSample = document.getElementById("grid-color-sample");
+const gridColorResetButton = document.getElementById("grid-color-reset");
 const saveCurrentButton = document.getElementById("save-current");
 const savedFileInput = document.getElementById("saved-file");
 const savedStatus = document.getElementById("saved-status");
@@ -60,6 +68,8 @@ const bookRangeField = document.getElementById("book-range-field");
 const bookSegmentInput = document.getElementById("book-segment");
 const modeTabButtons = [...document.querySelectorAll("[data-mode-tab]")];
 const guideContext = guideCanvas?.getContext("2d");
+const DEFAULT_GUIDE_GRID_COLOR = "#5b4736";
+const GUIDE_GRID_COLOR_STORAGE_KEY = "dudot-guide-grid-color";
 
 const APP_MODES = {
   SKETCHBOOK: "sketchbook",
@@ -205,6 +215,7 @@ let currentResultSnapshot = null;
 let lastViewportLayoutMode = getViewportLayoutMode();
 let activeMode = APP_MODES.SKETCHBOOK;
 let isCropStageExpanded = false;
+let guideGridColor = DEFAULT_GUIDE_GRID_COLOR;
 let pendingConversionContext = { mode: APP_MODES.SKETCHBOOK, bookSegmentId: null, bookSegmentCrop: null };
 let sketchbookSnapshot = null;
 let bookSnapshot = null;
@@ -277,6 +288,9 @@ zoomOutButton?.addEventListener("click", () => zoomGuideAtViewportCenter(1 / 1.2
 zoomResetButton?.addEventListener("click", () => fitGuideToViewport(true));
 zoomInButton?.addEventListener("click", () => zoomGuideAtViewportCenter(1.2));
 saveCurrentButton?.addEventListener("click", saveCurrentConversion);
+gridColorToggleButton?.addEventListener("click", toggleGridColorPanel);
+gridColorInput?.addEventListener("input", handleGridColorInput);
+gridColorResetButton?.addEventListener("click", resetGuideGridColor);
 savedFileInput?.addEventListener("change", handleSavedFileSelection);
 paletteMultiToggleButton?.addEventListener("click", togglePaletteMultiSelect);
 paletteCompleteButton?.addEventListener("click", completeActiveColorCells);
@@ -296,16 +310,101 @@ window.addEventListener("pointercancel", handleGuidePointerEnd);
 window.addEventListener("resize", handleWindowResize);
 window.addEventListener("keydown", handleWindowKeyDown);
 window.addEventListener("beforeunload", releaseSourceImage);
+document.addEventListener("pointerdown", handleGridColorPointerDown);
+document.addEventListener("keydown", handleGridColorKeyDown);
 
 cropResizeObserver?.observe(cropFrame);
 cropResizeObserver?.observe(cropImage);
 cropResizeObserver?.observe(expandedCropFrame);
 cropResizeObserver?.observe(expandedCropImage);
 
+loadStoredGuideGridColor();
+applyGuideGridColor(guideGridColor, { persist: false, redraw: false });
 renderSelectedFile();
 renderCropSelection();
 resetResultArea();
 applyModeUi();
+
+function toggleGridColorPanel() {
+  setGridColorPanelOpen(gridColorPanel?.hidden ?? true);
+}
+
+function setGridColorPanelOpen(isOpen) {
+  if (!gridColorPanel || !gridColorToggleButton) {
+    return;
+  }
+  gridColorPanel.hidden = !isOpen;
+  gridColorToggleButton.setAttribute("aria-expanded", String(isOpen));
+}
+
+function handleGridColorInput(event) {
+  applyGuideGridColor(event.target?.value || DEFAULT_GUIDE_GRID_COLOR);
+}
+
+function resetGuideGridColor() {
+  applyGuideGridColor(DEFAULT_GUIDE_GRID_COLOR);
+}
+
+function handleGridColorPointerDown(event) {
+  if (!gridColorControl || gridColorPanel?.hidden) {
+    return;
+  }
+  if (gridColorControl.contains(event.target)) {
+    return;
+  }
+  setGridColorPanelOpen(false);
+}
+
+function handleGridColorKeyDown(event) {
+  if (event.key !== "Escape" || gridColorPanel?.hidden) {
+    return;
+  }
+  setGridColorPanelOpen(false);
+  gridColorToggleButton?.focus();
+}
+
+function loadStoredGuideGridColor() {
+  try {
+    const storedColor = window.localStorage.getItem(GUIDE_GRID_COLOR_STORAGE_KEY);
+    const normalized = normalizeHexColor(storedColor);
+    if (normalized) {
+      guideGridColor = normalized;
+    }
+  } catch {
+  }
+}
+
+function applyGuideGridColor(nextColor, { persist = true, redraw = true } = {}) {
+  const normalized = normalizeHexColor(nextColor) || DEFAULT_GUIDE_GRID_COLOR;
+  guideGridColor = normalized;
+  updateGuideGridColorUi();
+  guideViewport?.style.setProperty("--grid-fade", rgbaFromHexColor(guideGridColor, 0.16));
+  if (persist) {
+    try {
+      window.localStorage.setItem(GUIDE_GRID_COLOR_STORAGE_KEY, guideGridColor);
+    } catch {
+    }
+  }
+  if (redraw && viewerState.rows > 0) {
+    drawGuideCanvas();
+  }
+}
+
+function updateGuideGridColorUi() {
+  const displayValue = guideGridColor.toUpperCase();
+  if (gridColorInput) {
+    gridColorInput.value = guideGridColor;
+  }
+  if (gridColorValue) {
+    gridColorValue.textContent = displayValue;
+  }
+  if (gridColorChip) {
+    gridColorChip.style.background = guideGridColor;
+  }
+  if (gridColorSample) {
+    gridColorSample.style.setProperty("--sample-color", guideGridColor);
+  }
+}
 
 function handleModeTabClick(event) {
   const nextMode = event.currentTarget?.dataset.modeTab;
@@ -2650,13 +2749,15 @@ function drawGuideCanvas() {
 }
 
 function drawGuideGridLines(startColumn, endColumn, startRow, endRow, cellSize, viewportWidth, viewportHeight) {
+  const strongGridLineColor = rgbaFromHexColor(guideGridColor, 0.58);
+  const baseGridLineColor = rgbaFromHexColor(guideGridColor, 0.18);
   for (let column = startColumn; column <= endColumn; column += 1) {
     const x = viewerState.panX + (column * cellSize);
     guideContext.beginPath();
     guideContext.moveTo(x, Math.max(0, viewerState.panY + (startRow * cellSize)));
     guideContext.lineTo(x, Math.min(viewportHeight, viewerState.panY + (endRow * cellSize)));
     guideContext.lineWidth = column % 5 === 0 ? Math.max(1.5, cellSize * 0.08) : 1;
-    guideContext.strokeStyle = column % 5 === 0 ? "rgba(91,71,54,.58)" : "rgba(122,100,83,.18)";
+    guideContext.strokeStyle = column % 5 === 0 ? strongGridLineColor : baseGridLineColor;
     guideContext.stroke();
   }
 
@@ -2666,7 +2767,7 @@ function drawGuideGridLines(startColumn, endColumn, startRow, endRow, cellSize, 
     guideContext.moveTo(Math.max(0, viewerState.panX + (startColumn * cellSize)), y);
     guideContext.lineTo(Math.min(viewportWidth, viewerState.panX + (endColumn * cellSize)), y);
     guideContext.lineWidth = row % 5 === 0 ? Math.max(1.5, cellSize * 0.08) : 1;
-    guideContext.strokeStyle = row % 5 === 0 ? "rgba(91,71,54,.58)" : "rgba(122,100,83,.18)";
+    guideContext.strokeStyle = row % 5 === 0 ? strongGridLineColor : baseGridLineColor;
     guideContext.stroke();
   }
 }
@@ -3363,6 +3464,22 @@ function mixHexColors(baseHex, overlayHex, overlayWeight = 0.5) {
 function hexToRgb(hexValue) {
   const clean = hexValue.replace("#", "");
   return [0, 2, 4].map((index) => Number.parseInt(clean.slice(index, index + 2), 16));
+}
+
+function normalizeHexColor(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!/^#([0-9a-fA-F]{6})$/.test(trimmed)) {
+    return null;
+  }
+  return `#${trimmed.slice(1).toLowerCase()}`;
+}
+
+function rgbaFromHexColor(hexValue, alpha = 1) {
+  const [red, green, blue] = hexToRgb(normalizeHexColor(hexValue) || DEFAULT_GUIDE_GRID_COLOR);
+  return `rgba(${red}, ${green}, ${blue}, ${clamp(alpha, 0, 1)})`;
 }
 
 function getActivePaletteCodes() {
