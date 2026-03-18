@@ -2751,6 +2751,8 @@ function drawGuideCanvas() {
 function drawGuideGridLines(startColumn, endColumn, startRow, endRow, cellSize, viewportWidth, viewportHeight) {
   const strongGridLineColor = rgbaFromHexColor(guideGridColor, 0.58);
   const baseGridLineColor = rgbaFromHexColor(guideGridColor, 0.18);
+  const strongRowOffset = getGuideStrongRowOffset();
+  const strongRowRemainder = strongRowOffset % 5;
   for (let column = startColumn; column <= endColumn; column += 1) {
     const x = viewerState.panX + (column * cellSize);
     const isStrongLine = column > 0 && column % 5 === 0;
@@ -2764,7 +2766,7 @@ function drawGuideGridLines(startColumn, endColumn, startRow, endRow, cellSize, 
 
   for (let row = startRow; row <= endRow; row += 1) {
     const y = viewerState.panY + (row * cellSize);
-    const isStrongLine = row > 0 && row % 5 === 0;
+    const isStrongLine = row >= strongRowOffset && row % 5 === strongRowRemainder;
     guideContext.beginPath();
     guideContext.moveTo(Math.max(0, viewerState.panX + (startColumn * cellSize)), y);
     guideContext.lineTo(Math.min(viewportWidth, viewerState.panX + (endColumn * cellSize)), y);
@@ -2772,6 +2774,15 @@ function drawGuideGridLines(startColumn, endColumn, startRow, endRow, cellSize, 
     guideContext.strokeStyle = isStrongLine ? strongGridLineColor : baseGridLineColor;
     guideContext.stroke();
   }
+}
+
+function getGuideStrongRowOffset() {
+  const ratio = activeMode === APP_MODES.BOOK ? BOOK_LAYOUT.ratio : ratioInput?.value;
+  const precision = activeMode === APP_MODES.BOOK ? BOOK_LAYOUT.precision : Number(precisionInput?.value);
+  if (precision === 4 && (ratio === "16:9" || ratio === "4:3")) {
+    return 4;
+  }
+  return 5;
 }
 
 function drawHoveredCell(cellSize) {
