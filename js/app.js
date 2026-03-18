@@ -2764,7 +2764,7 @@ function drawGuideGridLines(startColumn, endColumn, startRow, endRow, cellSize, 
 
   for (let row = startRow; row <= endRow; row += 1) {
     const y = viewerState.panY + (row * cellSize);
-    const isStrongLine = row > 0 && (row + 1) % 5 === 0;
+    const isStrongLine = row > 0 && row % 5 === 0;
     guideContext.beginPath();
     guideContext.moveTo(Math.max(0, viewerState.panX + (startColumn * cellSize)), y);
     guideContext.lineTo(Math.min(viewportWidth, viewerState.panX + (endColumn * cellSize)), y);
