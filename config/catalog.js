@@ -1,3 +1,12 @@
+/*
+Module: catalog
+Description: Shared canvas presets and palette catalog data.
+Domain: config
+Dependencies: none
+Usage:
+  import { CANVAS_PRESETS, PALETTE } from "./catalog.js";
+*/
+
 export const CANVAS_PRESETS = {
   "16:9": { 1: [30, 18], 2: [50, 28], 3: [100, 56], 4: [150, 84] },
   "4:3": { 1: [30, 24], 2: [50, 38], 3: [100, 76], 4: [150, 114] },

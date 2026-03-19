@@ -1,3 +1,4 @@
-python/__pycache__/
+__pycache__/
 *.png
+!githubiotest-home.png
 *.log
