@@ -433,6 +433,7 @@ const {
   viewerState,
   getGuideGridColor: () => guideGridColor,
   getActiveMode: () => activeMode,
+  getCurrentResultSnapshot: () => currentResultSnapshot,
   ratioInput,
   precisionInput,
   getBookSegment,

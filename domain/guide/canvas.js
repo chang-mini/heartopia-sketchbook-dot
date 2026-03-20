@@ -16,6 +16,7 @@ function createGuideCanvasController({
   viewerState,
   getGuideGridColor,
   getActiveMode,
+  getCurrentResultSnapshot,
   ratioInput,
   precisionInput,
   getBookSegment,
@@ -301,8 +302,17 @@ function createGuideCanvasController({
   }
 
   function getGuideStrongRowOffset() {
-    const ratio = getActiveMode() === APP_MODES.BOOK ? BOOK_LAYOUT.ratio : ratioInput?.value;
-    const precision = getActiveMode() === APP_MODES.BOOK ? BOOK_LAYOUT.precision : Number(precisionInput?.value);
+    const currentResultSnapshot = getCurrentResultSnapshot?.();
+    const ratio = getActiveMode() === APP_MODES.BOOK
+      ? BOOK_LAYOUT.ratio
+      : currentResultSnapshot?.canvas_mode === APP_MODES.SKETCHBOOK && typeof currentResultSnapshot?.ratio === "string"
+        ? currentResultSnapshot.ratio
+        : ratioInput?.value;
+    const precision = getActiveMode() === APP_MODES.BOOK
+      ? BOOK_LAYOUT.precision
+      : currentResultSnapshot?.canvas_mode === APP_MODES.SKETCHBOOK && Number.isFinite(Number(currentResultSnapshot?.precision))
+        ? Number(currentResultSnapshot.precision)
+        : Number(precisionInput?.value);
     if (precision === 4 && (ratio === "16:9" || ratio === "4:3")) {
       return 4;
     }

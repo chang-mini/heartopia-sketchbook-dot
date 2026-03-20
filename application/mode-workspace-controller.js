@@ -57,6 +57,69 @@ function createModeWorkspaceController({
   getBookSnapshot,
   getCropSelection,
 }) {
+  function hasSelectOption(select, value) {
+    return Boolean(
+      select
+      && typeof value === "string"
+      && Array.from(select.options || []).some((option) => option.value === value),
+    );
+  }
+
+  function inferRatioFromSnapshotSize(snapshot) {
+    if (!ratioInput) {
+      return null;
+    }
+
+    const width = Number(snapshot?.width);
+    const height = Number(snapshot?.height);
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      return null;
+    }
+
+    const actualRatio = width / height;
+    const bestMatch = Array.from(ratioInput.options || []).reduce((closest, option) => {
+      const [optionWidth, optionHeight] = option.value.split(":").map(Number);
+      if (!(optionWidth > 0 && optionHeight > 0)) {
+        return closest;
+      }
+
+      const diff = Math.abs(actualRatio - (optionWidth / optionHeight));
+      if (!closest || diff < closest.diff) {
+        return { value: option.value, diff };
+      }
+      return closest;
+    }, null);
+
+    return bestMatch && bestMatch.diff <= 0.08 ? bestMatch.value : null;
+  }
+
+  function syncSketchbookControlsFromSnapshot(snapshot) {
+    if (ratioInput) {
+      const nextRatio = hasSelectOption(ratioInput, snapshot?.ratio)
+        ? snapshot.ratio
+        : inferRatioFromSnapshotSize(snapshot);
+      if (nextRatio) {
+        ratioInput.value = nextRatio;
+      }
+    }
+
+    if (precisionInput) {
+      const nextPrecision = String(snapshot?.precision ?? "");
+      if (hasSelectOption(precisionInput, nextPrecision)) {
+        precisionInput.value = nextPrecision;
+      }
+    }
+  }
+
+  function getSketchbookControlSnapshot() {
+    const currentResultSnapshot = getCurrentResultSnapshot();
+    if (currentResultSnapshot?.canvas_mode === APP_MODES.SKETCHBOOK) {
+      return currentResultSnapshot;
+    }
+
+    return getSketchbookSnapshot();
+  }
+
   function handleModeTabClick(event) {
     const nextMode = event.currentTarget?.dataset.modeTab;
     if (!nextMode || nextMode === getActiveMode()) {
@@ -141,6 +204,9 @@ function createModeWorkspaceController({
       if (isBookMode) {
         precisionInput.value = String(BOOK_LAYOUT.precision);
       }
+    }
+    if (!isBookMode) {
+      syncSketchbookControlsFromSnapshot(getSketchbookControlSnapshot());
     }
     if (modeLockedNote) {
       modeLockedNote.hidden = !isBookMode;
