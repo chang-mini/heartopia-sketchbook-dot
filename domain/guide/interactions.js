@@ -236,13 +236,13 @@ function createGuideInteractionController({
       return false;
     }
 
-    const activeColorCodes = getActivePaletteCodes();
-    if (activeColorCodes.length === 0) {
+    const activeCode = viewerState.activeColorCode || getActivePaletteCodes()[0] || null;
+    if (!activeCode) {
       return false;
     }
 
     const code = viewerState.gridCodes[cell.row]?.[cell.column];
-    if (!code || !activeColorCodes.includes(code)) {
+    if (!code || code !== activeCode) {
       return false;
     }
 
