@@ -169,13 +169,13 @@ function createGuideCanvasController({
     const worldHeight = viewerState.rows * viewerState.scale;
 
     if (worldWidth <= size.width) {
-      viewerState.panX = (size.width - worldWidth) / 2;
+      viewerState.panX = clamp(viewerState.panX, 0, size.width - worldWidth);
     } else {
       viewerState.panX = clamp(viewerState.panX, size.width - worldWidth, 0);
     }
 
     if (worldHeight <= size.height) {
-      viewerState.panY = (size.height - worldHeight) / 2;
+      viewerState.panY = clamp(viewerState.panY, 0, size.height - worldHeight);
     } else {
       viewerState.panY = clamp(viewerState.panY, size.height - worldHeight, 0);
     }
