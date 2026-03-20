@@ -1085,6 +1085,10 @@
 
     #viewer-note {
       white-space: pre-line;
+      font-size: 12px;
+      line-height: 1.45;
+      word-break: keep-all;
+      overflow-wrap: normal;
     }
 
     .viewer-status {
