@@ -38,6 +38,7 @@ const viewerState = {
   activeColorCode: null,
   activeColorCodes: [],
   completedCells: new Set(),
+  showGrid: true,
 };
 
 const paletteState = {

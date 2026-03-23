@@ -18,6 +18,9 @@ function createResultViewController({
   zoomOutButton,
   zoomResetButton,
   zoomInButton,
+  gridToggleButton,
+  sidebarToggleButton,
+  canvasFullscreenButton,
   saveCurrentButton,
   viewerState,
   renderPalette,
@@ -92,6 +95,8 @@ function createResultViewController({
     viewerState.activeColorCode = null;
     viewerState.activeColorCodes = [];
     viewerState.completedCells = new Set();
+    viewerState.showGrid = true;
+    if (gridToggleButton) gridToggleButton.setAttribute("aria-pressed", "true");
     setGuideInteraction(null);
     clearGuideCanvas();
     updateSaveButtonState(false);
@@ -106,6 +111,9 @@ function createResultViewController({
     zoomOutButton.disabled = !enabled;
     zoomResetButton.disabled = !enabled;
     zoomInButton.disabled = !enabled;
+    if (gridToggleButton) gridToggleButton.disabled = !enabled;
+    if (sidebarToggleButton) sidebarToggleButton.disabled = !enabled;
+    if (canvasFullscreenButton) canvasFullscreenButton.disabled = !enabled;
   }
 
   function updateSaveButtonState(enabled) {

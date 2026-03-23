@@ -166,9 +166,15 @@
                 <button class="viewer-button wide" id="zoom-reset" type="button" disabled>맞춤</button>
                 <button class="viewer-button" id="zoom-in" type="button" disabled>+</button>
               </div>
+              <div class="viewer-action-row view-toggles">
+                <button class="viewer-button wide" id="grid-toggle" type="button" aria-pressed="true" disabled>격자</button>
+                <button class="viewer-button wide" id="sidebar-toggle" type="button" aria-pressed="false" disabled>사이드바 숨기기</button>
+                <button class="viewer-button wide" id="canvas-fullscreen" type="button" disabled>확대</button>
+              </div>
             </div>
           </div>
           <div class="guide-viewport" id="guide-viewport">
+            <button class="guide-fullscreen-close" id="guide-fullscreen-close" type="button">&times;</button>
             <canvas class="guide-canvas" id="guide-canvas"></canvas>
             <div class="guide-empty" id="guide-empty">
               <div class="empty-card">
@@ -243,10 +249,6 @@
     <div class="expanded-crop-panel">
       <div class="expanded-crop-head">
         <div class="expanded-crop-main">
-          <div>
-            <strong>범위 선택 확대</strong>
-            <p class="note">확대 화면에서 범위를 바로 조절하고 적용합니다.</p>
-          </div>
         </div>
         <div class="expanded-crop-actions">
           <div class="expanded-sketchbook-options" id="expanded-sketchbook-options" hidden>
@@ -300,7 +302,6 @@
           </div>
         </div>
       </div>
-      <p class="note crop-meta" id="expanded-crop-meta">사진을 올리면 확대 화면에서 범위를 조절할 수 있습니다.</p>
     </div>
   </div>
   <script src="./infrastructure/vendor/pyodide.js?v=20260319-modular-3"></script>

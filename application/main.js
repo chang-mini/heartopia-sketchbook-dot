@@ -8,6 +8,7 @@
 import {
   bookRangeField,
   bookSegmentInput,
+  canvasFullscreenButton,
   cropBox,
   cropFrame,
   cropImage,
@@ -42,6 +43,7 @@ import {
   guideContext,
   guideEmpty,
   guideEmptyText,
+  guideFullscreenClose,
   guideViewport,
   imageInput,
   mainShell,
@@ -72,6 +74,9 @@ import {
   zoomInButton,
   zoomOutButton,
   zoomResetButton,
+  gridToggleButton,
+  sidebar,
+  sidebarToggleButton,
 } from "../infrastructure/browser/dom-elements.js";
 import { buildCroppedFilename, canvasToBlob, getPreferredUploadType, triggerFileDownload } from "../infrastructure/browser/files.js";
 import { createPyodideConverter } from "../infrastructure/pyodide/runtime.js";
@@ -344,6 +349,9 @@ const {
   zoomOutButton,
   zoomResetButton,
   zoomInButton,
+  gridToggleButton,
+  sidebarToggleButton,
+  canvasFullscreenButton,
   saveCurrentButton,
   viewerState,
   renderPalette,
@@ -487,6 +495,9 @@ const {
   handleGuidePointerDown,
   handleGuidePointerEnd,
   handleGuidePointerMove,
+  handleGuideTouchEnd,
+  handleGuideTouchMove,
+  handleGuideTouchStart,
   handleGuideWheel,
   isCodeCompleted,
 } = createGuideInteractionController({
@@ -807,11 +818,58 @@ cropFrame?.addEventListener("dblclick", () => resetCropSelection("sidebar"));
 expandedCropFrame?.addEventListener("dblclick", () => resetCropSelection("expanded"));
 guideViewport?.addEventListener("wheel", handleGuideWheel, { passive: false });
 guideViewport?.addEventListener("pointerdown", handleGuidePointerDown);
+guideViewport?.addEventListener("touchstart", handleGuideTouchStart, { passive: false });
+guideViewport?.addEventListener("touchmove", handleGuideTouchMove, { passive: false });
+guideViewport?.addEventListener("touchend", handleGuideTouchEnd);
 guideViewport?.addEventListener("pointermove", handleGuideHover);
 guideViewport?.addEventListener("pointerleave", clearGuideHover);
 zoomOutButton?.addEventListener("click", () => zoomGuideAtViewportCenter(1 / 1.2));
 zoomResetButton?.addEventListener("click", () => fitGuideToViewport(true));
 zoomInButton?.addEventListener("click", () => zoomGuideAtViewportCenter(1.2));
+gridToggleButton?.addEventListener("click", () => {
+  viewerState.showGrid = !viewerState.showGrid;
+  gridToggleButton.setAttribute("aria-pressed", String(viewerState.showGrid));
+  drawGuideCanvas();
+});
+sidebarToggleButton?.addEventListener("click", () => {
+  const isHidden = sidebar.classList.toggle("is-hidden");
+  mainShell.classList.toggle("sidebar-hidden", isHidden);
+  sidebarToggleButton.setAttribute("aria-pressed", String(isHidden));
+  sidebarToggleButton.textContent = isHidden ? "사이드바 보이기" : "사이드바 숨기기";
+  mainShell.addEventListener("transitionend", () => {
+    window.requestAnimationFrame(() => fitGuideToViewport(true));
+  }, { once: true });
+});
+let fullscreenPreviousParent = null;
+let fullscreenPreviousSibling = null;
+function enterCanvasFullscreen() {
+  fullscreenPreviousParent = guideViewport.parentNode;
+  fullscreenPreviousSibling = guideViewport.nextSibling;
+  document.body.appendChild(guideViewport);
+  guideViewport.classList.add("is-fullscreen");
+  document.body.classList.add("canvas-fullscreen");
+  window.requestAnimationFrame(() => fitGuideToViewport(true));
+}
+function exitCanvasFullscreen() {
+  guideViewport.classList.remove("is-fullscreen");
+  document.body.classList.remove("canvas-fullscreen");
+  if (fullscreenPreviousParent) {
+    fullscreenPreviousParent.insertBefore(guideViewport, fullscreenPreviousSibling);
+  }
+  fullscreenPreviousParent = null;
+  fullscreenPreviousSibling = null;
+  window.requestAnimationFrame(() => fitGuideToViewport(true));
+}
+canvasFullscreenButton?.addEventListener("click", enterCanvasFullscreen);
+guideFullscreenClose?.addEventListener("pointerdown", (event) => {
+  event.stopPropagation();
+});
+guideFullscreenClose?.addEventListener("click", exitCanvasFullscreen);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && guideViewport.classList.contains("is-fullscreen")) {
+    exitCanvasFullscreen();
+  }
+});
 saveCurrentButton?.addEventListener("click", saveCurrentConversion);
 gridColorToggleButton?.addEventListener("click", toggleGridColorPanel);
 gridColorInput?.addEventListener("input", handleGridColorInput);

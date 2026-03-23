@@ -139,6 +139,68 @@ function createGuideInteractionController({
     }
   }
 
+  let pinchState = null;
+
+  function getTouchDistance(t1, t2) {
+    return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+  }
+
+  function getTouchCenter(t1, t2, rect) {
+    return {
+      x: ((t1.clientX + t2.clientX) / 2) - rect.left,
+      y: ((t1.clientY + t2.clientY) / 2) - rect.top,
+    };
+  }
+
+  function handleGuideTouchStart(event) {
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      const guideInteraction = getGuideInteraction();
+      if (guideInteraction) {
+        guideViewport.classList.remove("is-dragging");
+        guideViewport.releasePointerCapture?.(guideInteraction.pointerId);
+        setGuideInteraction(null);
+      }
+      const rect = guideViewport.getBoundingClientRect();
+      pinchState = {
+        startDistance: getTouchDistance(event.touches[0], event.touches[1]),
+        startScale: viewerState.scale,
+        startPanX: viewerState.panX,
+        startPanY: viewerState.panY,
+        startCenter: getTouchCenter(event.touches[0], event.touches[1], rect),
+      };
+    }
+  }
+
+  function handleGuideTouchMove(event) {
+    if (!pinchState || event.touches.length !== 2) {
+      return;
+    }
+    event.preventDefault();
+    const rect = guideViewport.getBoundingClientRect();
+    const currentDistance = getTouchDistance(event.touches[0], event.touches[1]);
+    const currentCenter = getTouchCenter(event.touches[0], event.touches[1], rect);
+    const scaleFactor = currentDistance / pinchState.startDistance;
+    const nextScale = Math.min(viewerState.maxScale, Math.max(viewerState.minScale, pinchState.startScale * scaleFactor));
+
+    const gridX = (pinchState.startCenter.x - pinchState.startPanX) / pinchState.startScale;
+    const gridY = (pinchState.startCenter.y - pinchState.startPanY) / pinchState.startScale;
+
+    viewerState.scale = nextScale;
+    viewerState.panX = currentCenter.x - (gridX * nextScale);
+    viewerState.panY = currentCenter.y - (gridY * nextScale);
+
+    clampGuidePan();
+    drawGuideCanvas();
+    updateViewerNote();
+  }
+
+  function handleGuideTouchEnd(event) {
+    if (pinchState && event.touches.length < 2) {
+      pinchState = null;
+    }
+  }
+
   function handleGuideHover(event) {
     if (!viewerState.rows || !viewerState.columns || getGuideInteraction()) {
       return;
@@ -313,6 +375,9 @@ function createGuideInteractionController({
     handleGuidePointerDown,
     handleGuidePointerEnd,
     handleGuidePointerMove,
+    handleGuideTouchEnd,
+    handleGuideTouchMove,
+    handleGuideTouchStart,
     handleGuideWheel,
     isCodeCompleted,
   };
