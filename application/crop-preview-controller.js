@@ -146,6 +146,20 @@ function createCropPreviewController({
 
   function handlePrecisionChange() {
     syncExpandedSketchbookControls();
+    if (getActiveMode() !== APP_MODES.SKETCHBOOK) {
+      return;
+    }
+    if (!getSelectedFile()) {
+      return;
+    }
+
+    if (cropImage?.naturalWidth) {
+      const targetViewKey = getIsCropStageExpanded() ? "expanded" : "sidebar";
+      applyDefaultCropSelection(targetViewKey);
+      if (targetViewKey === "expanded") {
+        syncExpandedSelectionToSidebar();
+      }
+    }
   }
 
   function handleExpandedRatioChange(event) {

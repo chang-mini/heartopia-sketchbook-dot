@@ -5,6 +5,7 @@
   DEFAULT_PALETTE_ITEMS,
   GUIDE_GRID_COLOR_STORAGE_KEY,
 } from "../config/app-constants.js";
+import { CANVAS_PRESETS } from "../config/catalog.js";
 import {
   bookRangeField,
   bookSegmentInput,
@@ -187,7 +188,9 @@ const {
 } = createCropRatioController({
   APP_MODES,
   BOOK_LAYOUT,
+  CANVAS_PRESETS,
   ratioInput,
+  precisionInput,
   getBookSegment,
   getActiveMode: () => activeMode,
   getSelectedBookSegmentId: () => selectedBookSegmentId,

@@ -39,7 +39,15 @@ def convert_dot_snapshot(payload_json: str) -> str:
         composed = Image.alpha_composite(background, image).convert("RGB")
         # The browser crop box already defines the exact framing.
         # Resize directly so the selected area is preserved without a second crop.
-        fitted = composed.resize((width, height), resample=RESAMPLING.LANCZOS)
+        # Use NEAREST when source matches or is close to target size to avoid
+        # introducing anti-aliased intermediate colors (e.g. grays in pure B&W art).
+        src_w, src_h = composed.size
+        if src_w == width and src_h == height:
+            fitted = composed
+        elif abs(src_w - width) <= 2 and abs(src_h - height) <= 2:
+            fitted = composed.resize((width, height), resample=RESAMPLING.NEAREST)
+        else:
+            fitted = composed.resize((width, height), resample=RESAMPLING.LANCZOS)
         source_pixels = list(fitted.getdata())
 
     usage: Counter[str] = Counter()

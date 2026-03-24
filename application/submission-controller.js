@@ -154,6 +154,8 @@ function createSubmissionController({
     if (!context) {
       throw new Error("이미지 크롭 캔버스를 만들 수 없습니다.");
     }
+    // Disable smoothing to preserve exact pixel colors (critical for pixel art).
+    context.imageSmoothingEnabled = false;
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.drawImage(
       naturalImage,

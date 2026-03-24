@@ -10,7 +10,9 @@ Usage:
 function createCropRatioController({
   APP_MODES,
   BOOK_LAYOUT,
+  CANVAS_PRESETS,
   ratioInput,
+  precisionInput,
   getBookSegment,
   getActiveMode,
   getSelectedBookSegmentId,
@@ -21,7 +23,14 @@ function createCropRatioController({
       return segment.width / BOOK_LAYOUT.usableHeight;
     }
 
-    const [width, height] = ratioInput.value.split(":").map(Number);
+    const ratio = ratioInput.value;
+    const precision = Number(precisionInput.value);
+    const preset = CANVAS_PRESETS[ratio]?.[precision];
+    if (preset) {
+      return preset[0] / preset[1];
+    }
+
+    const [width, height] = ratio.split(":").map(Number);
     return width > 0 && height > 0 ? width / height : 1;
   }
 
