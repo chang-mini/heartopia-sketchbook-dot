@@ -1,0 +1,98 @@
+    form,
+    .field {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .field label {
+      color: var(--muted-strong);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .02em;
+    }
+
+    .field-note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    input,
+    select,
+    button {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      border-radius: 16px;
+      border: 1px solid rgba(35, 27, 23, .14);
+      font-size: 15px;
+      line-height: 1.4;
+    }
+
+    input,
+    select {
+      min-height: 52px;
+      padding: 10px 14px;
+      color: var(--ink);
+      background: #fffefb;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7);
+    }
+
+    input:disabled,
+    select:disabled {
+      color: rgba(78, 68, 63, .82);
+      background: linear-gradient(180deg, rgba(244, 236, 225, .92), rgba(236, 226, 214, .92));
+      cursor: not-allowed;
+      opacity: 1;
+    }
+
+    input:focus,
+    select:focus,
+    button:focus-visible {
+      outline: none;
+      border-color: rgba(187, 92, 50, .52);
+      box-shadow: 0 0 0 4px rgba(187, 92, 50, .14);
+    }
+
+    input[type="file"] {
+      overflow: hidden;
+      min-height: 58px;
+      padding: 8px 10px;
+      background: #fbf7ef;
+    }
+
+    input[type="file"]::file-selector-button {
+      margin-right: 12px;
+      border: none;
+      border-radius: 12px;
+      padding: 11px 14px;
+      font-weight: 700;
+      color: #fff;
+      background: linear-gradient(135deg, #37474f, #647179);
+      cursor: pointer;
+    }
+
+    button {
+      min-height: 52px;
+      padding: 10px 16px;
+      color: #fff;
+      font-weight: 800;
+      letter-spacing: -.01em;
+      border: none;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), #dd8b54);
+      box-shadow: 0 12px 24px rgba(187, 92, 50, .24);
+      transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 28px rgba(187, 92, 50, .28);
+    }
+
+    button:disabled {
+      opacity: .68;
+      cursor: wait;
+      box-shadow: none;
+    }

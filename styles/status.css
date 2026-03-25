@@ -1,0 +1,35 @@
+    .status-pill {
+      display: inline-flex;
+      width: fit-content;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .track {
+      position: relative;
+      height: 12px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(35, 27, 23, .08);
+    }
+
+    .track::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, rgba(255, 255, 255, .3), transparent 60%);
+      pointer-events: none;
+    }
+
+    .bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(135deg, var(--accent), #f0b06d);
+      transition: width .2s ease;
+    }

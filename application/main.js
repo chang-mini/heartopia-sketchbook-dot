@@ -122,6 +122,8 @@ import { createViewerInfoController } from "./viewer-info-controller.js";
 import { createViewportController, getViewportLayoutMode } from "./viewport-controller.js";
 import { buildPaletteGroups } from "../domain/palette/groups.js";
 
+// ─── STATE ───────────────────────────────────────────────────────────────────
+
 let activeSocket = null;
 let activeJobId = null;
 let pollingHandle = null;
@@ -159,6 +161,9 @@ const cropResizeObserver = typeof ResizeObserver === "function"
     scheduleCropLayoutRefresh();
   })
   : null;
+// ─── CONTROLLERS ─────────────────────────────────────────────────────────────
+
+  // -- Crop workspace & geometry --
 const {
   getCropSelectionForView,
   getCropViewByKey,
@@ -278,6 +283,7 @@ const {
   getCropPixelsForSelection,
   renderBookCropOverlays,
 });
+  // -- Palette --
 const {
   ensurePalettePageForActiveGroup,
   getActivePaletteCodes,
@@ -315,6 +321,7 @@ const {
     updateViewerDetail();
   },
 });
+  // -- Viewer info --
 const {
   getActiveColorProgressText,
   isBookCanvasMode,
@@ -333,6 +340,7 @@ const {
   getSelectedBookSegmentId: () => selectedBookSegmentId,
   getCurrentResultSnapshot: () => currentResultSnapshot,
 });
+  // -- Result view --
 const {
   prepareGuideViewer,
   renderCompleted,
@@ -372,6 +380,7 @@ const {
     guideInteraction = nextInteraction;
   },
 });
+  // -- Conversion session --
 const {
   buildPortableSnapshot,
   finishTracking,
@@ -425,7 +434,10 @@ const {
     submitButton.disabled = !enabled;
   },
 });
+  // -- Pyodide converter --
 const { convertImageLocally } = createPyodideConverter({ setStatus });
+
+  // -- Guide canvas --
 const {
   clampGuidePan,
   clearGuideCanvas,
@@ -461,6 +473,7 @@ const {
   getGuideLabelColor,
   rgbaFromHexColor,
 });
+  // -- Grid color --
 const {
   applyGuideGridColor,
   handleGridColorInput,
@@ -489,6 +502,7 @@ const {
     guideGridColor = nextColor;
   },
 });
+  // -- Guide interaction --
 const {
   clearGuideHover,
   completeActiveColorCells,
@@ -520,6 +534,7 @@ const {
   updateViewerNote,
   updateViewerDetail,
 });
+  // -- Crop preview --
 const {
   applyExpandedCropSelectionAndConvert,
   clearCropPreview,
@@ -599,6 +614,7 @@ const {
     expandedCropDraft = draft;
   },
 });
+  // -- Mode workspace --
 const {
   applyModeUi,
   buildBookSnapshotFromGrid,
@@ -664,6 +680,7 @@ const {
   getBookSnapshot: () => bookSnapshot,
   getCropSelection: () => cropSelection,
 });
+  // -- Mode snapshot --
 const {
   applyModeSnapshot,
   captureCurrentModeUiState,
@@ -711,6 +728,7 @@ const {
     submitButton.disabled = !enabled;
   },
 });
+  // -- Saved file --
 const {
   handleSavedFileSelection,
 } = createSavedFileController({
@@ -731,6 +749,7 @@ const {
     activeMode = nextMode;
   },
 });
+  // -- Submission --
 submissionController = createSubmissionController({
   APP_MODES,
   BOOK_LAYOUT,
@@ -783,6 +802,7 @@ submissionController = createSubmissionController({
   getIsCropStageExpanded: () => isCropStageExpanded,
   setCropStageExpanded,
 });
+  // -- Viewport --
 const { handleWindowResize } = createViewportController({
   viewerState,
   viewerShell,
@@ -796,6 +816,8 @@ const { handleWindowResize } = createViewportController({
     lastViewportLayoutMode = nextMode;
   },
 });
+
+// ─── EVENT LISTENERS ─────────────────────────────────────────────────────────
 
 imageInput?.addEventListener("change", handleImageSelection);
 ratioInput?.addEventListener("change", handleRatioChange);
@@ -899,10 +921,14 @@ window.addEventListener("beforeunload", releaseSourceImage);
 document.addEventListener("pointerdown", handleGridColorPointerDown);
 document.addEventListener("keydown", handleGridColorKeyDown);
 
+// ─── OBSERVERS ───────────────────────────────────────────────────────────────
+
 cropResizeObserver?.observe(cropFrame);
 cropResizeObserver?.observe(cropImage);
 cropResizeObserver?.observe(expandedCropFrame);
 cropResizeObserver?.observe(expandedCropImage);
+
+// ─── BOOT ────────────────────────────────────────────────────────────────────
 
 loadStoredGuideGridColor();
 applyGuideGridColor(guideGridColor, { persist: false, redraw: false });

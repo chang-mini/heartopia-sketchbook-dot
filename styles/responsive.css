@@ -1,0 +1,328 @@
+    @media (max-width:1500px) {
+      body {
+        overflow-y: auto;
+      }
+
+      main {
+        height: auto;
+        min-height: 100vh;
+        min-height: 100dvh;
+      }
+
+      main.has-palette-sidebar {
+        padding-right: 0;
+      }
+
+      .workspace-main {
+        height: auto;
+        min-height: auto;
+        overflow: visible;
+      }
+
+      .viewer-shell {
+        min-height: auto;
+        height: auto;
+      }
+
+      .palette-toolbar-actions {
+        margin-top: 4px;
+      }
+
+      .palette-action-button,
+      .palette-complete {
+        flex: 0 0 auto;
+      }
+
+      .palette-sidebar {
+        position: static;
+        inset: auto;
+        width: auto;
+        z-index: auto;
+        overflow: visible;
+        margin: 0 26px 24px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background: linear-gradient(180deg, rgba(255, 252, 246, .9), rgba(239, 229, 214, .92));
+        box-shadow: var(--shadow);
+      }
+
+      .viewer-head {
+        flex-direction: column;
+      }
+
+      .viewer-actions {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .viewer-action-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .viewer-summary {
+        width: 100%;
+      }
+
+      .viewer-track {
+        max-width: 100%;
+      }
+    }
+
+    @media (max-width:1180px) {
+      body {
+        overflow-y: auto;
+      }
+
+      main,
+      main.sidebar-hidden {
+        height: auto;
+        padding-left: 0;
+        padding-right: 0;
+        gap: 16px;
+      }
+
+      .sidebar,
+      .inspector {
+        position: static;
+        width: auto;
+        overflow: visible;
+        border: none;
+        background: none;
+        box-shadow: none;
+        transform: none !important;
+      }
+
+      .viewer-head {
+        flex-direction: column;
+      }
+
+      .viewer-actions {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .viewer-action-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      #sidebar-toggle {
+        display: none;
+      }
+
+      .viewer-summary {
+        width: 100%;
+      }
+
+      .viewer-track {
+        max-width: 100%;
+      }
+
+      .sidebar-shell,
+      .inspector-shell {
+        min-height: auto;
+        margin: 0 16px;
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background: linear-gradient(180deg, rgba(255, 252, 246, .9), rgba(239, 229, 214, .92));
+        backdrop-filter: blur(18px);
+        box-shadow: var(--shadow);
+      }
+
+      .workspace-main {
+        height: auto;
+        min-height: auto;
+        padding: 0 16px 24px;
+        overflow: visible;
+      }
+
+      .viewer-shell {
+        min-height: auto;
+        height: auto;
+      }
+
+      .guide-viewport {
+        min-height: clamp(630px, 87vh, 960px);
+        height: auto;
+      }
+
+      .mode-bar-head {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .mode-tabs {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .mode-tab {
+        min-width: 0;
+      }
+
+      .palette-sidebar {
+        position: static;
+        inset: auto;
+        width: auto;
+        z-index: auto;
+        overflow: visible;
+        margin: 0 16px 24px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background: linear-gradient(180deg, rgba(255, 252, 246, .9), rgba(239, 229, 214, .92));
+        box-shadow: var(--shadow);
+      }
+    }
+
+    @media (max-width:760px) {
+
+      .panel,
+      .sidebar-shell,
+      .inspector-shell {
+        border-radius: 22px;
+      }
+
+      .crop-head,
+      .viewer-head,
+      .palette-head {
+        flex-direction: column;
+      }
+
+      .mode-tabs {
+        grid-template-columns: 1fr;
+      }
+
+      .ghost-button {
+        width: 100%;
+      }
+
+      .crop-actions {
+        width: auto;
+        display: inline-flex;
+      }
+
+      .crop-head-main {
+        align-items: center;
+      }
+
+      .crop-actions .ghost-button {
+        width: auto;
+      }
+
+      .palette-toolbar-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .palette-toolbar-actions .ghost-button {
+        width: 100%;
+      }
+
+      .viewer-actions {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .viewer-action-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .viewer-grid-color {
+        width: auto;
+      }
+
+      .guide-viewport {
+        min-height: clamp(480px, 78vh, 690px);
+      }
+
+      .expanded-crop-modal {
+        inset: 8px;
+      }
+
+      .expanded-crop-panel {
+        gap: 12px;
+        padding: 14px;
+        border-radius: 22px;
+        max-height: calc(100dvh - 16px);
+      }
+
+      .expanded-crop-main {
+        align-items: flex-start;
+      }
+
+      .expanded-crop-actions {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        overflow-x: visible;
+      }
+
+      .expanded-book-segment-wrap,
+      .expanded-sketchbook-options {
+        width: 100%;
+      }
+
+      .expanded-sketchbook-options {
+        justify-content: space-between;
+      }
+
+      .expanded-control-field {
+        flex: 1 1 120px;
+      }
+
+      .expanded-control-field label {
+        flex: 0 0 auto;
+      }
+
+      .expanded-crop-select,
+      .expanded-book-segment-select {
+        min-width: 0;
+        width: 100%;
+      }
+
+      .expanded-crop-actions .crop-action-button,
+      .expanded-crop-actions .ghost-button {
+        flex: 1 1 calc(50% - 6px);
+        min-width: 0;
+      }
+
+      .expanded-crop-actions .crop-submit-button {
+        flex-basis: 100%;
+      }
+
+      .expanded-crop-modal .crop-image {
+        width: auto;
+        max-width: 100%;
+        height: auto;
+        max-height: 100%;
+      }
+
+      .expanded-crop-modal .crop-frame {
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+      }
+
+      .sidebar-brand-head {
+        flex-wrap: wrap;
+      }
+
+      .brand-link {
+        width: 100%;
+      }
+    }
