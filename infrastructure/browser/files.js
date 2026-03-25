@@ -13,8 +13,9 @@ function canvasToBlob(canvas, type) {
   });
 }
 
-function getPreferredUploadType(fileType) {
-  return ["image/png", "image/jpeg", "image/webp"].includes(fileType) ? fileType : "image/png";
+function getPreferredUploadType(_fileType) {
+  // 팔레트 매칭 전 JPEG 재압축 아티팩트를 막기 위해 항상 PNG(무손실)로 내보냄
+  return "image/png";
 }
 
 function buildCroppedFilename(filename, mimeType) {
