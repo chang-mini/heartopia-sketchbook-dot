@@ -114,7 +114,7 @@ const PALETTE_BY_CODE = new Map(PALETTE.map((item) => [item.code, item]));
 const PYODIDE_INDEX_URL = "https://cdn.jsdelivr.net/pyodide/v0.29.3/full/";
 const PYTHON_MODULE_DIR = "../../domain/conversion";
 const PYTHON_MODULE_FILES = ["palette.py", "presets.py", "converter.py"];
-const PYTHON_MODULE_VERSION = "20260315-2";
+const PYTHON_MODULE_VERSION = "20260421-tuning-3";
 
 export {
   APP_MODES,

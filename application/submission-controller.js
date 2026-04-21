@@ -53,6 +53,7 @@ function createSubmissionController({
   getCurrentResultSnapshot,
   getIsCropStageExpanded,
   setCropStageExpanded,
+  getTuningValues,
 }) {
   async function startConversion(event) {
     event?.preventDefault();
@@ -107,6 +108,7 @@ function createSubmissionController({
         precision,
         canvasWidth,
         canvasHeight,
+        tuning: getTuningValues?.() ?? null,
       });
       setActiveJobId(snapshot.job_id);
       handleSnapshot(snapshot);

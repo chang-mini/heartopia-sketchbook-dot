@@ -4,26 +4,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>뜌타 스케치북 도안 생성기 | 두근두근타운 도트 변환</title>
-  <meta name="description" content="두근두근타운(Heartopia) 스케치북·북커버용 도트 도안을 이미지에서 자동 생성하는 무료 웹 도구입니다. 125색 팔레트 매칭, 크롭, 저장까지 브라우저에서 바로!">
-  <meta name="keywords" content="두근두근타운, heartopia, 뜌타, 스케치북, 도트변환, 도안생성, 픽셀아트, 북커버, 짱만">
-  <link rel="canonical" href="https://chang-mini.github.io/heartopia-sketchbook-dot/">
-
-  <!-- Open Graph -->
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="뜌타 스케치북 도안 생성기">
-  <meta property="og:description" content="두근두근타운 스케치북·북커버용 도트 도안을 이미지에서 자동 생성하는 무료 웹 도구">
-  <meta property="og:url" content="https://chang-mini.github.io/heartopia-sketchbook-dot/">
-  <meta property="og:image" content="https://chang-mini.github.io/heartopia-sketchbook-dot/favicon.png">
-  <meta property="og:locale" content="ko_KR">
-
-  <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="뜌타 스케치북 도안 생성기">
-  <meta name="twitter:description" content="두근두근타운 스케치북·북커버용 도트 도안을 이미지에서 자동 생성">
-
+  <title>두근두근타운 스케치북</title>
   <link rel="icon" type="image/png" href="./favicon.png?v=20260319-favicon-1">
-  <link rel='stylesheet' href='./styles/main.css?v=20260325-split-1'>
+  <link rel='stylesheet' href='./styles/main.css?v=20260421-tuning-3'>
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-CESZZXVJ33"></script>
   <script>
@@ -88,6 +71,28 @@
               </div>
               <button id="submit-button" type="button">도안 생성 시작</button>
             </form>
+          </section>
+
+          <section class="sidebar-section tuning-panel">
+            <div class="tuning-head">
+              <strong class="tuning-title">색상 보정</strong>
+              <button id="tuning-reset" type="button" class="tuning-reset-button">기본값</button>
+            </div>
+            <div class="tuning-row">
+              <label for="tuning-saturation">채도</label>
+              <input id="tuning-saturation" type="range" min="0" max="2" step="0.01" value="1">
+              <input id="tuning-saturation-value" class="tuning-value-input" type="number" min="0" max="2" step="0.01" value="1.00">
+            </div>
+            <div class="tuning-row">
+              <label for="tuning-contrast">명암</label>
+              <input id="tuning-contrast" type="range" min="0" max="2" step="0.01" value="1">
+              <input id="tuning-contrast-value" class="tuning-value-input" type="number" min="0" max="2" step="0.01" value="1.00">
+            </div>
+            <div class="tuning-row">
+              <label for="tuning-brightness">밝기</label>
+              <input id="tuning-brightness" type="range" min="0" max="2" step="0.01" value="1">
+              <input id="tuning-brightness-value" class="tuning-value-input" type="number" min="0" max="2" step="0.01" value="1.00">
+            </div>
           </section>
 
           <section class="sidebar-section saved-panel">
@@ -332,7 +337,7 @@
     </div>
   </div>
   <script src="./infrastructure/vendor/pyodide.js?v=20260319-modular-3"></script>
-  <script type="module" src="./application/main.js?v=20260319-modular-3"></script>
+  <script type="module" src="./application/main.js?v=20260421-tuning-3"></script>
 </body>
 
 </html>

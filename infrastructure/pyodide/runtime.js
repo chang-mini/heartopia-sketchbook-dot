@@ -47,6 +47,7 @@ function createPyodideConverter({ setStatus }) {
     precision,
     canvasWidth,
     canvasHeight,
+    tuning,
   }) {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const safeName = buildPythonSafeFilename(file.name || originalName || "upload.png");
@@ -61,6 +62,9 @@ function createPyodideConverter({ setStatus }) {
         precision,
         canvas_width: canvasWidth,
         canvas_height: canvasHeight,
+        saturation: tuning?.saturation ?? 1.0,
+        contrast: tuning?.contrast ?? 1.0,
+        brightness: tuning?.brightness ?? 1.0,
       });
 
       pyodide.globals.set("conversion_payload_json", payload);
@@ -84,6 +88,7 @@ function createPyodideConverter({ setStatus }) {
     precision,
     canvasWidth = null,
     canvasHeight = null,
+    tuning = null,
   }) {
     const preset = getCanvasPreset(ratio, precision, canvasWidth, canvasHeight);
     const pyodide = await ensurePythonRuntime();
@@ -96,6 +101,7 @@ function createPyodideConverter({ setStatus }) {
       precision,
       canvasWidth: preset.width,
       canvasHeight: preset.height,
+      tuning,
     });
 
     const timestamp = new Date().toISOString();

@@ -78,6 +78,13 @@ import {
   gridToggleButton,
   sidebar,
   sidebarToggleButton,
+  tuningSaturation,
+  tuningSaturationValue,
+  tuningContrast,
+  tuningContrastValue,
+  tuningBrightness,
+  tuningBrightnessValue,
+  tuningReset,
 } from "../infrastructure/browser/dom-elements.js";
 import { buildCroppedFilename, canvasToBlob, getPreferredUploadType, triggerFileDownload } from "../infrastructure/browser/files.js";
 import { createPyodideConverter } from "../infrastructure/pyodide/runtime.js";
@@ -749,6 +756,58 @@ const {
     activeMode = nextMode;
   },
 });
+  // -- Color tuning --
+const TUNING_DEFAULTS = { saturation: 1.0, contrast: 1.0, brightness: 1.0 };
+const TUNING_MIN = 0;
+const TUNING_MAX = 2;
+function formatTuningValue(value) {
+  return Number(value).toFixed(2);
+}
+function clampTuningValue(raw) {
+  const num = Number(raw);
+  if (!Number.isFinite(num)) return null;
+  if (num < TUNING_MIN) return TUNING_MIN;
+  if (num > TUNING_MAX) return TUNING_MAX;
+  return num;
+}
+function getTuningValues() {
+  return {
+    saturation: tuningSaturation ? Number(tuningSaturation.value) : TUNING_DEFAULTS.saturation,
+    contrast: tuningContrast ? Number(tuningContrast.value) : TUNING_DEFAULTS.contrast,
+    brightness: tuningBrightness ? Number(tuningBrightness.value) : TUNING_DEFAULTS.brightness,
+  };
+}
+function pushSliderToInput(slider, valueInput) {
+  if (slider && valueInput) {
+    valueInput.value = formatTuningValue(slider.value);
+  }
+}
+function pushInputToSlider(slider, valueInput) {
+  if (!slider || !valueInput) return;
+  const clamped = clampTuningValue(valueInput.value);
+  if (clamped === null) return;
+  slider.value = String(clamped);
+}
+function commitInputDisplay(valueInput) {
+  if (!valueInput) return;
+  const clamped = clampTuningValue(valueInput.value);
+  if (clamped === null) {
+    valueInput.value = formatTuningValue(TUNING_DEFAULTS.saturation);
+  } else {
+    valueInput.value = formatTuningValue(clamped);
+  }
+}
+function resetTuningToDefaults() {
+  if (tuningSaturation) tuningSaturation.value = String(TUNING_DEFAULTS.saturation);
+  if (tuningContrast) tuningContrast.value = String(TUNING_DEFAULTS.contrast);
+  if (tuningBrightness) tuningBrightness.value = String(TUNING_DEFAULTS.brightness);
+  pushSliderToInput(tuningSaturation, tuningSaturationValue);
+  pushSliderToInput(tuningContrast, tuningContrastValue);
+  pushSliderToInput(tuningBrightness, tuningBrightnessValue);
+}
+pushSliderToInput(tuningSaturation, tuningSaturationValue);
+pushSliderToInput(tuningContrast, tuningContrastValue);
+pushSliderToInput(tuningBrightness, tuningBrightnessValue);
   // -- Submission --
 submissionController = createSubmissionController({
   APP_MODES,
@@ -801,6 +860,7 @@ submissionController = createSubmissionController({
   getCurrentResultSnapshot: () => currentResultSnapshot,
   getIsCropStageExpanded: () => isCropStageExpanded,
   setCropStageExpanded,
+  getTuningValues,
 });
   // -- Viewport --
 const { handleWindowResize } = createViewportController({
@@ -920,6 +980,16 @@ window.addEventListener("keydown", handleWindowKeyDown);
 window.addEventListener("beforeunload", releaseSourceImage);
 document.addEventListener("pointerdown", handleGridColorPointerDown);
 document.addEventListener("keydown", handleGridColorKeyDown);
+tuningSaturation?.addEventListener("input", () => pushSliderToInput(tuningSaturation, tuningSaturationValue));
+tuningContrast?.addEventListener("input", () => pushSliderToInput(tuningContrast, tuningContrastValue));
+tuningBrightness?.addEventListener("input", () => pushSliderToInput(tuningBrightness, tuningBrightnessValue));
+tuningSaturationValue?.addEventListener("input", () => pushInputToSlider(tuningSaturation, tuningSaturationValue));
+tuningContrastValue?.addEventListener("input", () => pushInputToSlider(tuningContrast, tuningContrastValue));
+tuningBrightnessValue?.addEventListener("input", () => pushInputToSlider(tuningBrightness, tuningBrightnessValue));
+tuningSaturationValue?.addEventListener("change", () => { commitInputDisplay(tuningSaturationValue); pushInputToSlider(tuningSaturation, tuningSaturationValue); });
+tuningContrastValue?.addEventListener("change", () => { commitInputDisplay(tuningContrastValue); pushInputToSlider(tuningContrast, tuningContrastValue); });
+tuningBrightnessValue?.addEventListener("change", () => { commitInputDisplay(tuningBrightnessValue); pushInputToSlider(tuningBrightness, tuningBrightnessValue); });
+tuningReset?.addEventListener("click", resetTuningToDefaults);
 
 // ─── OBSERVERS ───────────────────────────────────────────────────────────────
 

@@ -80,6 +80,13 @@ const bookRangeField = document.getElementById("book-range-field");
 const bookSegmentInput = document.getElementById("book-segment");
 const modeTabButtons = [...document.querySelectorAll("[data-mode-tab]")];
 const guideContext = guideCanvas?.getContext("2d");
+const tuningSaturation = document.getElementById("tuning-saturation");
+const tuningSaturationValue = document.getElementById("tuning-saturation-value");
+const tuningContrast = document.getElementById("tuning-contrast");
+const tuningContrastValue = document.getElementById("tuning-contrast-value");
+const tuningBrightness = document.getElementById("tuning-brightness");
+const tuningBrightnessValue = document.getElementById("tuning-brightness-value");
+const tuningReset = document.getElementById("tuning-reset");
 
 export {
   bookRangeField,
@@ -155,4 +162,11 @@ export {
   gridToggleButton,
   sidebar,
   sidebarToggleButton,
+  tuningSaturation,
+  tuningSaturationValue,
+  tuningContrast,
+  tuningContrastValue,
+  tuningBrightness,
+  tuningBrightnessValue,
+  tuningReset,
 };

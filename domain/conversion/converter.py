@@ -4,7 +4,7 @@ import json
 from collections import Counter
 from functools import lru_cache
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageEnhance, ImageOps
 
 from palette import PALETTE
 from presets import get_custom_preset
@@ -20,6 +20,9 @@ def convert_dot_snapshot(payload_json: str) -> str:
         payload.get("canvas_width"),
         payload.get("canvas_height"),
     )
+    saturation = float(payload.get("saturation", 1.0))
+    contrast = float(payload.get("contrast", 1.0))
+    brightness = float(payload.get("brightness", 1.0))
 
     @lru_cache(maxsize=65536)
     def nearest_palette_color(red: int, green: int, blue: int) -> dict[str, object]:
@@ -37,6 +40,12 @@ def convert_dot_snapshot(payload_json: str) -> str:
         image = corrected.convert("RGBA")
         background = Image.new("RGBA", image.size, "white")
         composed = Image.alpha_composite(background, image).convert("RGB")
+        if saturation != 1.0:
+            composed = ImageEnhance.Color(composed).enhance(saturation)
+        if contrast != 1.0:
+            composed = ImageEnhance.Contrast(composed).enhance(contrast)
+        if brightness != 1.0:
+            composed = ImageEnhance.Brightness(composed).enhance(brightness)
         # The browser crop box already defines the exact framing.
         # Resize directly so the selected area is preserved without a second crop.
         # Use NEAREST when source matches or is close to target size to avoid
