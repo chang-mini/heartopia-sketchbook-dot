@@ -87,6 +87,17 @@ const tuningContrastValue = document.getElementById("tuning-contrast-value");
 const tuningBrightness = document.getElementById("tuning-brightness");
 const tuningBrightnessValue = document.getElementById("tuning-brightness-value");
 const tuningReset = document.getElementById("tuning-reset");
+const multiRangeField = document.getElementById("multi-range-field");
+const multiLayoutField = document.getElementById("multi-layout-field");
+const multiSplitCountInput = document.getElementById("multi-split-count");
+const multiLayoutSelect = document.getElementById("multi-layout");
+const expandedMultiOptions = document.getElementById("expanded-multi-options");
+const expandedMultiSplitCountInput = document.getElementById("expanded-multi-split-count");
+const expandedMultiLayoutSelect = document.getElementById("expanded-multi-layout");
+const multiSplitOverlayLayer = document.getElementById("multi-split-overlay-layer");
+const expandedMultiSplitOverlayLayer = document.getElementById("expanded-multi-split-overlay-layer");
+const multiPieceTabBar = document.getElementById("multi-piece-tab-bar");
+const multiMosaicView = document.getElementById("multi-mosaic-view");
 
 export {
   bookRangeField,
@@ -169,4 +180,15 @@ export {
   tuningBrightness,
   tuningBrightnessValue,
   tuningReset,
+  multiRangeField,
+  multiLayoutField,
+  multiSplitCountInput,
+  multiLayoutSelect,
+  expandedMultiOptions,
+  expandedMultiSplitCountInput,
+  expandedMultiLayoutSelect,
+  multiSplitOverlayLayer,
+  expandedMultiSplitOverlayLayer,
+  multiPieceTabBar,
+  multiMosaicView,
 };

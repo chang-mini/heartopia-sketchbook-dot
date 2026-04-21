@@ -15,6 +15,31 @@ const GUIDE_GRID_COLOR_STORAGE_KEY = "dudot-guide-grid-color";
 const APP_MODES = {
   SKETCHBOOK: "sketchbook",
   BOOK: "book",
+  MULTI_SKETCHBOOK: "multi_sketchbook",
+};
+
+const MULTI_SPLIT_OPTIONS = [2, 4, 6, 8, 10];
+
+const MULTI_LAYOUTS = {
+  2: [
+    { rows: 1, cols: 2, label: "1×2", locked: false },
+    { rows: 2, cols: 1, label: "2×1", locked: false },
+  ],
+  4: [
+    { rows: 2, cols: 2, label: "2×2", locked: true },
+  ],
+  6: [
+    { rows: 2, cols: 3, label: "2×3", locked: false },
+    { rows: 3, cols: 2, label: "3×2", locked: false },
+  ],
+  8: [
+    { rows: 2, cols: 4, label: "2×4", locked: false },
+    { rows: 4, cols: 2, label: "4×2", locked: false },
+  ],
+  10: [
+    { rows: 2, cols: 5, label: "2×5", locked: false },
+    { rows: 5, cols: 2, label: "5×2", locked: false },
+  ],
 };
 
 const BOOK_LAYOUT = (() => {
@@ -124,6 +149,8 @@ export {
   GROUP_DISPLAY_ORDER,
   GROUP_MAIN_COLORS,
   GUIDE_GRID_COLOR_STORAGE_KEY,
+  MULTI_LAYOUTS,
+  MULTI_SPLIT_OPTIONS,
   PALETTE_BY_CODE,
   PYODIDE_INDEX_URL,
   PYTHON_MODULE_DIR,

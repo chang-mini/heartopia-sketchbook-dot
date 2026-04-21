@@ -4,6 +4,7 @@
   DEFAULT_GUIDE_GRID_COLOR,
   DEFAULT_PALETTE_ITEMS,
   GUIDE_GRID_COLOR_STORAGE_KEY,
+  PALETTE_BY_CODE,
 } from "../config/app-constants.js";
 import { CANVAS_PRESETS } from "../config/catalog.js";
 import {
@@ -85,6 +86,17 @@ import {
   tuningBrightness,
   tuningBrightnessValue,
   tuningReset,
+  multiRangeField,
+  multiLayoutField,
+  multiSplitCountInput,
+  multiLayoutSelect,
+  expandedMultiOptions,
+  expandedMultiSplitCountInput,
+  expandedMultiLayoutSelect,
+  multiPieceTabBar,
+  multiMosaicView,
+  multiSplitOverlayLayer,
+  expandedMultiSplitOverlayLayer,
 } from "../infrastructure/browser/dom-elements.js";
 import { buildCroppedFilename, canvasToBlob, getPreferredUploadType, triggerFileDownload } from "../infrastructure/browser/files.js";
 import { createPyodideConverter } from "../infrastructure/pyodide/runtime.js";
@@ -100,6 +112,12 @@ import {
   normalizeStoredBookCrop,
 } from "../domain/book/grid.js";
 import { createBookCropOverlayRenderer } from "../domain/crop/book-overlays.js";
+import { createMultiSplitOverlayRenderer } from "../domain/crop/multi-overlays.js";
+import { createMosaicRenderer } from "../domain/multi/mosaic.js";
+import { computePieceRects, getDefaultLayoutForCount } from "../domain/multi/layout.js";
+import { buildMultiBundleFilename, buildMultiPieceFilename } from "../domain/multi/filename.js";
+import { buildMultiBundleSnapshot } from "../domain/multi/bundle.js";
+import { createMultiSketchbookController } from "./multi-sketchbook-controller.js";
 import { createCropInteractionController } from "../domain/crop/interactions.js";
 import { createCropSelectionController } from "../domain/crop/selection.js";
 import { createCropWorkspaceController } from "../domain/crop/workspace.js";
@@ -145,9 +163,11 @@ let lastViewportLayoutMode = getViewportLayoutMode();
 let activeMode = APP_MODES.SKETCHBOOK;
 let isCropStageExpanded = false;
 let guideGridColor = DEFAULT_GUIDE_GRID_COLOR;
-let pendingConversionContext = { mode: APP_MODES.SKETCHBOOK, bookSegmentId: null, bookSegmentCrop: null };
+let pendingConversionContext = { mode: APP_MODES.SKETCHBOOK, bookSegmentId: null, bookSegmentCrop: null, pieceIndex: null, totalPieces: null, multiLayout: null };
 let sketchbookSnapshot = null;
 let bookSnapshot = null;
+let currentMultiSnapshot = null;
+let multiController = null;
 let submissionController = null;
 const modeUiStates = {
   [APP_MODES.SKETCHBOOK]: {
@@ -158,14 +178,24 @@ const modeUiStates = {
     snapshotKey: null,
     state: createDefaultModeUiState(),
   },
+  [APP_MODES.MULTI_SKETCHBOOK]: {
+    snapshotKey: null,
+    state: createDefaultModeUiState(),
+  },
 };
 const renderSelectedFile = () => {};
 const startConversion = (event) => submissionController?.startConversion(event);
-const saveCurrentConversion = () => submissionController?.saveCurrentConversion();
+const saveCurrentConversion = () => {
+  if (activeMode === APP_MODES.MULTI_SKETCHBOOK) {
+    return saveMultiSketchbookSnapshot();
+  }
+  return submissionController?.saveCurrentConversion();
+};
 let selectedBookSegmentId = bookSegmentInput?.value || "back_cover";
 const cropResizeObserver = typeof ResizeObserver === "function"
   ? new ResizeObserver(() => {
     scheduleCropLayoutRefresh();
+    try { renderMultiSplitOverlays(); } catch (_) { /* TDZ guard during init */ }
   })
   : null;
 // ─── CONTROLLERS ─────────────────────────────────────────────────────────────
@@ -206,6 +236,7 @@ const {
   getBookSegment,
   getActiveMode: () => activeMode,
   getSelectedBookSegmentId: () => selectedBookSegmentId,
+  getMultiLayout: () => multiController?.getActiveLayout() || null,
 });
 const {
   buildDisplayCropRect,
@@ -249,6 +280,52 @@ const { renderBookCropOverlays } = createBookCropOverlayRenderer({
   normalizeBookAppliedSegments,
   normalizeBookSegmentCrops,
 });
+const { renderMultiSplitOverlays } = createMultiSplitOverlayRenderer({
+  APP_MODES,
+  getActiveMode: () => activeMode,
+  getVisibleCropViews,
+  getActiveLayout: () => multiController?.getActiveLayout() || null,
+  getCropSelectionForView,
+  getCropDisplayMetrics,
+});
+const { renderMosaicView, clearMosaicView } = createMosaicRenderer({
+  container: multiMosaicView,
+  getPaletteByCode: () => PALETTE_BY_CODE,
+  isMultiModeActive: () => activeMode === APP_MODES.MULTI_SKETCHBOOK,
+});
+multiController = createMultiSketchbookController({
+  APP_MODES,
+  multiSplitCountInput,
+  multiLayoutSelect,
+  multiLayoutField,
+  expandedMultiSplitCountInput,
+  expandedMultiLayoutSelect,
+  multiPieceTabBar,
+  getActiveMode: () => activeMode,
+  getCurrentMultiSnapshot: () => currentMultiSnapshot,
+  setCurrentMultiSnapshot: (snapshot) => {
+    currentMultiSnapshot = snapshot;
+  },
+  onLayoutChanged: () => {
+    if (activeMode === APP_MODES.MULTI_SKETCHBOOK) {
+      if (cropImage?.naturalWidth) {
+        applyDefaultCropSelection();
+      }
+      renderMultiSplitOverlays();
+    }
+  },
+  onSplitCountChanged: () => {
+    if (activeMode === APP_MODES.MULTI_SKETCHBOOK) {
+      if (cropImage?.naturalWidth) {
+        applyDefaultCropSelection();
+      }
+      renderMultiSplitOverlays();
+    }
+  },
+  onPieceTabChanged: (nextIndex) => {
+    handleMultiPieceTabChange(nextIndex);
+  },
+});
 const {
   applyDefaultCropSelection,
   getCropPixels,
@@ -289,6 +366,7 @@ const {
   computeResizedSelection,
   getCropPixelsForSelection,
   renderBookCropOverlays,
+  renderMultiSplitOverlays,
 });
   // -- Palette --
 const {
@@ -346,6 +424,7 @@ const {
   getActiveMode: () => activeMode,
   getSelectedBookSegmentId: () => selectedBookSegmentId,
   getCurrentResultSnapshot: () => currentResultSnapshot,
+  getCurrentMultiSnapshot: () => currentMultiSnapshot,
 });
   // -- Result view --
 const {
@@ -629,6 +708,7 @@ const {
   handleBookSegmentChange,
   handleModeTabClick,
   renderEmptyBookWorkspace,
+  renderEmptyMultiWorkspace,
   setActiveMode,
   setPaletteVisibility,
   updateModeSummary,
@@ -650,6 +730,13 @@ const {
   modeTabButtons,
   paletteSidebar,
   mainShell,
+  multiRangeField,
+  multiLayoutField,
+  expandedMultiOptions,
+  multiPieceTabBar,
+  multiMosaicView,
+  multiSplitOverlayLayer,
+  expandedMultiSplitOverlayLayer,
   createEmptyGridCodes,
   buildUsedColorsFromGrid,
   normalizeBookAppliedSegments,
@@ -660,15 +747,32 @@ const {
   getNaturalCropImageElement,
   loadGuideGrid,
   renderBookCropOverlays,
+  renderMultiSplitOverlays,
   prepareGuideViewer,
   updateSaveButtonState,
   updateViewerNote,
   syncExpandedSketchbookControls,
   resetResultArea,
   stopTracking,
-  persistCurrentSnapshotByMode: () => persistCurrentSnapshotByMode(),
+  persistCurrentSnapshotByMode: () => {
+    // MULTI pieces are tagged canvas_mode="sketchbook" for viewer compat,
+    // but they must NOT overwrite the real sketchbookSnapshot. Multi keeps
+    // its own state in currentMultiSnapshot, so simply skip the persist.
+    if (activeMode === APP_MODES.MULTI_SKETCHBOOK) return;
+    persistCurrentSnapshotByMode();
+  },
   persistCurrentModeUiState: () => persistCurrentModeUiState(),
   applyModeSnapshot: (snapshot) => applyModeSnapshot(snapshot),
+  hideMultiPieceTabs: () => multiController?.hidePieceTabs?.(),
+  clearMultiMosaicView: () => {
+    clearMosaicView();
+    // loadOverviewIntoViewer hides the guide canvas so the mosaic can own
+    // the viewport. Restore it now that we're leaving the overview so that
+    // sketchbook/book conversions remain visible.
+    if (guideCanvas) guideCanvas.style.display = "";
+  },
+  syncMultiControlsFromSnapshot: (snapshot) => syncMultiControlsFromMultiSnapshot(snapshot),
+  restoreMultiViewFromSnapshot: () => restoreMultiViewFromSnapshot(),
   getActiveMode: () => activeMode,
   setActiveModeValue: (nextMode) => {
     activeMode = nextMode;
@@ -685,6 +789,10 @@ const {
   getSelectedFile: () => selectedFile,
   getSketchbookSnapshot: () => sketchbookSnapshot,
   getBookSnapshot: () => bookSnapshot,
+  getCurrentMultiSnapshot: () => currentMultiSnapshot,
+  setCurrentMultiSnapshot: (snapshot) => {
+    currentMultiSnapshot = snapshot;
+  },
   getCropSelection: () => cropSelection,
 });
   // -- Mode snapshot --
@@ -747,7 +855,13 @@ const {
   primeModeUiStateForSnapshot,
   extractSavedUiState,
   stopTracking: () => stopTracking(),
-  persistCurrentSnapshotByMode: () => persistCurrentSnapshotByMode(),
+  persistCurrentSnapshotByMode: () => {
+    // MULTI pieces are tagged canvas_mode="sketchbook" for viewer compat,
+    // but they must NOT overwrite the real sketchbookSnapshot. Multi keeps
+    // its own state in currentMultiSnapshot, so simply skip the persist.
+    if (activeMode === APP_MODES.MULTI_SKETCHBOOK) return;
+    persistCurrentSnapshotByMode();
+  },
   persistCurrentModeUiState: () => persistCurrentModeUiState(),
   buildPortableSnapshot,
   applyModeSnapshot: (snapshot) => applyModeSnapshot(snapshot),
@@ -755,6 +869,7 @@ const {
   setActiveModeValue: (nextMode) => {
     activeMode = nextMode;
   },
+  applyMultiBundleSnapshot: (snapshot, savedUiState, sourceName) => applyMultiBundleSnapshot(snapshot, savedUiState, sourceName),
 });
   // -- Color tuning --
 const TUNING_DEFAULTS = { saturation: 1.0, contrast: 1.0, brightness: 1.0 };
@@ -861,6 +976,45 @@ submissionController = createSubmissionController({
   getIsCropStageExpanded: () => isCropStageExpanded,
   setCropStageExpanded,
   getTuningValues,
+  getMultiActiveLayout: () => multiController?.getActiveLayout() || null,
+  computeMultiPieceRects: (selection, layout) => computePieceRects(selection, layout),
+  onMultiConversionStart: ({ layout, totalPieces, sourceFilename, ratio, precision }) => {
+    currentMultiSnapshot = {
+      sessionId: `multi-${Date.now()}`,
+      sourceFilename,
+      layout: { rows: layout.rows, cols: layout.cols, count: layout.count },
+      pieceRatio: ratio,
+      piecePrecision: precision,
+      pieces: [],
+      activePieceIndex: null,
+      createdAt: new Date().toISOString(),
+    };
+  },
+  onMultiPieceCompleted: ({ pieceIndex, snapshot }) => {
+    if (!currentMultiSnapshot) return;
+    currentMultiSnapshot.pieces[pieceIndex] = {
+      grid_codes: Array.isArray(snapshot.grid_codes) ? snapshot.grid_codes : [],
+      used_colors: Array.isArray(snapshot.used_colors) ? snapshot.used_colors : [],
+      width: snapshot.width,
+      height: snapshot.height,
+      ratio: snapshot.ratio,
+      precision: snapshot.precision,
+      filename: snapshot.filename,
+      created_at: snapshot.created_at,
+      updated_at: snapshot.updated_at,
+    };
+  },
+  onMultiConversionFinished: () => {
+    if (!currentMultiSnapshot) return;
+    loadOverviewIntoViewer();
+  },
+  onMultiConversionFailed: () => {
+    currentMultiSnapshot = null;
+    currentResultSnapshot = null;
+    multiController?.hidePieceTabs();
+    clearMosaicView();
+    updateSaveButtonState(false);
+  },
 });
   // -- Viewport --
 const { handleWindowResize } = createViewportController({
@@ -969,6 +1123,23 @@ expandedBookSegmentInput?.addEventListener("change", handleBookSegmentChange);
 expandedRatioInput?.addEventListener("change", handleExpandedRatioChange);
 expandedPrecisionInput?.addEventListener("change", handleExpandedPrecisionChange);
 modeTabButtons.forEach((button) => button.addEventListener("click", handleModeTabClick));
+multiSplitCountInput?.addEventListener("change", (event) => multiController?.handleSplitCountChange(event));
+multiLayoutSelect?.addEventListener("change", (event) => multiController?.handleLayoutChange(event));
+expandedMultiSplitCountInput?.addEventListener("change", (event) => multiController?.handleSplitCountChange(event));
+expandedMultiLayoutSelect?.addEventListener("change", (event) => multiController?.handleLayoutChange(event));
+multiPieceTabBar?.addEventListener("click", (event) => multiController?.handlePieceTabBarClick(event));
+ratioInput?.addEventListener("change", () => {
+  if (activeMode === APP_MODES.MULTI_SKETCHBOOK && cropImage?.naturalWidth) {
+    applyDefaultCropSelection();
+    renderMultiSplitOverlays();
+  }
+});
+precisionInput?.addEventListener("change", () => {
+  if (activeMode === APP_MODES.MULTI_SKETCHBOOK && cropImage?.naturalWidth) {
+    applyDefaultCropSelection();
+    renderMultiSplitOverlays();
+  }
+});
 window.addEventListener("pointermove", handleCropPointerMove);
 window.addEventListener("pointerup", handleCropPointerEnd);
 window.addEventListener("pointercancel", handleCropPointerEnd);
@@ -997,6 +1168,157 @@ cropResizeObserver?.observe(cropFrame);
 cropResizeObserver?.observe(cropImage);
 cropResizeObserver?.observe(expandedCropFrame);
 cropResizeObserver?.observe(expandedCropImage);
+
+// ─── MULTI SKETCHBOOK HELPERS ────────────────────────────────────────────────
+
+function syncMultiControlsFromMultiSnapshot(snapshot) {
+  if (!snapshot || !multiController) return;
+  const count = Number(snapshot.layout?.count ?? (snapshot.layout?.rows * snapshot.layout?.cols));
+  const label = snapshot.layout ? `${snapshot.layout.rows}×${snapshot.layout.cols}` : null;
+  if (Number.isFinite(count) && count > 0) {
+    multiController.setSplitCountAndLayout(count, label);
+  }
+  if (ratioInput && snapshot.pieceRatio) ratioInput.value = snapshot.pieceRatio;
+  if (precisionInput && snapshot.piecePrecision != null) precisionInput.value = String(snapshot.piecePrecision);
+}
+
+function loadPieceIntoViewer(index) {
+  if (!currentMultiSnapshot) return;
+  const piece = currentMultiSnapshot.pieces?.[index];
+  if (!piece) return;
+  // Hide mosaic, show canvas + piece grid.
+  clearMosaicView();
+  if (guideEmpty) guideEmpty.hidden = true;
+  if (guideCanvas) guideCanvas.style.display = "";
+  const pieceSnapshot = {
+    ...piece,
+    canvas_mode: APP_MODES.SKETCHBOOK,
+  };
+  currentResultSnapshot = pieceSnapshot;
+  currentMultiSnapshot.activePieceIndex = index;
+  loadGuideGrid(piece.grid_codes, piece.used_colors || []);
+  setPaletteVisibility(true);
+  updateViewerNote();
+  updateSaveButtonState(true);
+  multiController?.renderPieceTabs(currentMultiSnapshot.pieces, currentMultiSnapshot.layout, index);
+}
+
+function loadOverviewIntoViewer() {
+  if (!currentMultiSnapshot) return;
+  currentMultiSnapshot.activePieceIndex = null;
+  // Hide canvas + empty placeholder so the mosaic owns the viewport area.
+  clearGuideCanvas();
+  if (guideCanvas) guideCanvas.style.display = "none";
+  if (guideEmpty) guideEmpty.hidden = true;
+  renderMosaicView({
+    pieces: currentMultiSnapshot.pieces,
+    layout: currentMultiSnapshot.layout,
+    onTileClick: (tileIndex) => loadPieceIntoViewer(tileIndex),
+  });
+  setPaletteVisibility(false);
+  multiController?.renderPieceTabs(currentMultiSnapshot.pieces, currentMultiSnapshot.layout, null);
+  updateViewerNote();
+  updateSaveButtonState(true);
+}
+
+function handleMultiPieceTabChange(nextIndex) {
+  if (activeMode !== APP_MODES.MULTI_SKETCHBOOK || !currentMultiSnapshot) return;
+  if (nextIndex === null || nextIndex === undefined) {
+    loadOverviewIntoViewer();
+  } else {
+    loadPieceIntoViewer(Number(nextIndex));
+  }
+}
+
+function restoreMultiViewFromSnapshot() {
+  // Re-enters multi mode from a preserved in-memory session
+  // (mode switch back, not a fresh conversion).
+  if (!currentMultiSnapshot) return false;
+  const pieces = currentMultiSnapshot.pieces;
+  const layout = currentMultiSnapshot.layout;
+  if (!Array.isArray(pieces) || !layout) return false;
+  if (pieces.length !== layout.count) return false;
+
+  const idx = currentMultiSnapshot.activePieceIndex;
+  if (idx === null || idx === undefined) {
+    loadOverviewIntoViewer();
+  } else {
+    loadPieceIntoViewer(Number(idx));
+  }
+  return true;
+}
+
+function applyMultiBundleSnapshot(snapshot, savedUiState, sourceName) {
+  if (!snapshot || !Array.isArray(snapshot.multi_pieces)) return;
+
+  activeMode = APP_MODES.MULTI_SKETCHBOOK;
+  const layout = snapshot.multi_layout || null;
+  currentMultiSnapshot = {
+    sessionId: snapshot.job_id || `multi-${Date.now()}`,
+    sourceFilename: snapshot.source_filename || snapshot.filename || sourceName || null,
+    layout: layout ? { rows: layout.rows, cols: layout.cols, count: layout.count ?? (layout.rows * layout.cols) } : null,
+    pieceRatio: snapshot.ratio || null,
+    piecePrecision: snapshot.precision ?? null,
+    pieces: snapshot.multi_pieces.map((piece) => ({
+      grid_codes: piece.grid_codes || [],
+      used_colors: piece.used_colors || [],
+      width: piece.width,
+      height: piece.height,
+      ratio: piece.ratio,
+      precision: piece.precision,
+      filename: piece.filename,
+      created_at: piece.created_at,
+      updated_at: piece.updated_at,
+    })),
+    activePieceIndex: snapshot.active_piece_index ?? null,
+    createdAt: snapshot.created_at || new Date().toISOString(),
+  };
+
+  syncMultiControlsFromMultiSnapshot(currentMultiSnapshot);
+  applyModeUi();
+
+  if (currentMultiSnapshot.activePieceIndex === null || currentMultiSnapshot.activePieceIndex === undefined) {
+    loadOverviewIntoViewer();
+  } else {
+    loadPieceIntoViewer(Number(currentMultiSnapshot.activePieceIndex));
+  }
+}
+
+async function saveMultiSketchbookSnapshot() {
+  if (!currentMultiSnapshot) return;
+  const { sourceFilename, layout, pieces } = currentMultiSnapshot;
+  if (!layout || !Array.isArray(pieces) || pieces.length !== layout.count) return;
+
+  const bundlePayload = {
+    type: "duduta-dot-save",
+    version: 1,
+    exported_at: new Date().toISOString(),
+    snapshot: buildMultiBundleSnapshot(currentMultiSnapshot),
+    ui_state: captureCurrentModeUiState(),
+  };
+  const bundleBlob = new Blob([JSON.stringify(bundlePayload, null, 2)], { type: "application/json" });
+  triggerFileDownload(bundleBlob, buildMultiBundleFilename(sourceFilename, layout.rows, layout.cols));
+
+  for (let i = 0; i < pieces.length; i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    const piece = pieces[i];
+    const pieceIndex1Based = i + 1;
+    const pieceSnapshot = buildPortableSnapshot({
+      ...piece,
+      canvas_mode: APP_MODES.SKETCHBOOK,
+      filename: `${(sourceFilename || "piece").replace(/\.[^.]+$/, "")}_multi_${layout.count}x${pieceIndex1Based}.png`,
+    });
+    const piecePayload = {
+      type: "duduta-dot-save",
+      version: 1,
+      exported_at: new Date().toISOString(),
+      snapshot: pieceSnapshot,
+      ui_state: captureCurrentModeUiState(),
+    };
+    const pieceBlob = new Blob([JSON.stringify(piecePayload, null, 2)], { type: "application/json" });
+    triggerFileDownload(pieceBlob, buildMultiPieceFilename(sourceFilename, layout.count, pieceIndex1Based));
+  }
+}
 
 // ─── BOOT ────────────────────────────────────────────────────────────────────
 

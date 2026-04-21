@@ -26,6 +26,13 @@ function createModeWorkspaceController({
   modeTabButtons,
   paletteSidebar,
   mainShell,
+  multiRangeField,
+  multiLayoutField,
+  expandedMultiOptions,
+  multiPieceTabBar,
+  multiMosaicView,
+  multiSplitOverlayLayer,
+  expandedMultiSplitOverlayLayer,
   createEmptyGridCodes,
   buildUsedColorsFromGrid,
   normalizeBookAppliedSegments,
@@ -36,6 +43,7 @@ function createModeWorkspaceController({
   getNaturalCropImageElement,
   loadGuideGrid,
   renderBookCropOverlays,
+  renderMultiSplitOverlays = () => {},
   prepareGuideViewer,
   updateSaveButtonState,
   updateViewerNote,
@@ -45,6 +53,10 @@ function createModeWorkspaceController({
   persistCurrentSnapshotByMode,
   persistCurrentModeUiState,
   applyModeSnapshot,
+  hideMultiPieceTabs = () => {},
+  clearMultiMosaicView = () => {},
+  syncMultiControlsFromSnapshot = () => {},
+  restoreMultiViewFromSnapshot = () => false,
   getActiveMode,
   setActiveModeValue,
   getIsCropStageExpanded,
@@ -55,6 +67,8 @@ function createModeWorkspaceController({
   getSelectedFile,
   getSketchbookSnapshot,
   getBookSnapshot,
+  getCurrentMultiSnapshot = () => null,
+  setCurrentMultiSnapshot = () => {},
   getCropSelection,
 }) {
   function hasSelectOption(select, value) {
@@ -177,6 +191,24 @@ function createModeWorkspaceController({
       } else {
         resetResultArea();
       }
+      hideMultiPieceTabs();
+      clearMultiMosaicView();
+      renderMultiSplitOverlays();
+      return;
+    }
+
+    if (getActiveMode() === APP_MODES.MULTI_SKETCHBOOK) {
+      const multiSnapshot = getCurrentMultiSnapshot();
+      if (multiSnapshot) {
+        syncMultiControlsFromSnapshot(multiSnapshot);
+        const restored = restoreMultiViewFromSnapshot();
+        if (!restored) {
+          renderEmptyMultiWorkspace();
+        }
+      } else {
+        renderEmptyMultiWorkspace();
+      }
+      renderMultiSplitOverlays();
       return;
     }
 
@@ -186,10 +218,25 @@ function createModeWorkspaceController({
     } else {
       renderEmptyBookWorkspace();
     }
+    hideMultiPieceTabs();
+    clearMultiMosaicView();
+    renderMultiSplitOverlays();
+  }
+
+  function renderEmptyMultiWorkspace() {
+    prepareGuideViewer("멀티스케치북 모드: 분할 수와 배치를 고르고 범위를 잡은 뒤 도안을 생성하세요.");
+    setCurrentResultSnapshot(null);
+    setCurrentMultiSnapshot(null);
+    updateSaveButtonState(false);
+    setPaletteVisibility(false);
+    updateViewerNote();
+    hideMultiPieceTabs();
+    clearMultiMosaicView();
   }
 
   function applyModeUi() {
     const isBookMode = getActiveMode() === APP_MODES.BOOK;
+    const isMultiMode = getActiveMode() === APP_MODES.MULTI_SKETCHBOOK;
     if (submitButton) {
       submitButton.textContent = "도안 생성 시작";
     }
@@ -226,8 +273,41 @@ function createModeWorkspaceController({
     if (expandedSketchbookOptions) {
       expandedSketchbookOptions.hidden = isBookMode;
     }
+    if (multiRangeField) {
+      multiRangeField.hidden = !isMultiMode;
+    }
+    if (multiLayoutField) {
+      multiLayoutField.hidden = !isMultiMode;
+    }
+    if (expandedMultiOptions) {
+      expandedMultiOptions.hidden = !isMultiMode;
+    }
+    // Any multi-only DOM living OUTSIDE the sidebar must also be forced hidden
+    // when leaving multi mode so piece tabs / mosaic / split overlays never
+    // bleed into sketchbook or book mode.
+    if (!isMultiMode) {
+      if (multiPieceTabBar) {
+        multiPieceTabBar.hidden = true;
+        multiPieceTabBar.innerHTML = "";
+      }
+      if (multiMosaicView) {
+        multiMosaicView.hidden = true;
+        multiMosaicView.innerHTML = "";
+        multiMosaicView.style.gridTemplateRows = "";
+        multiMosaicView.style.gridTemplateColumns = "";
+      }
+      if (multiSplitOverlayLayer) {
+        multiSplitOverlayLayer.hidden = true;
+        multiSplitOverlayLayer.innerHTML = "";
+      }
+      if (expandedMultiSplitOverlayLayer) {
+        expandedMultiSplitOverlayLayer.hidden = true;
+        expandedMultiSplitOverlayLayer.innerHTML = "";
+      }
+    }
     syncExpandedSketchbookControls();
     expandedCropModal?.classList.toggle("is-book-mode", isBookMode);
+    expandedCropModal?.classList.toggle("is-multi-mode", isMultiMode);
 
     modeTabButtons.forEach((button) => {
       const isActive = button.dataset.modeTab === getActiveMode();
@@ -236,6 +316,7 @@ function createModeWorkspaceController({
     });
 
     updateModeSummary();
+    renderMultiSplitOverlays();
   }
 
   function updateModeSummary() {
@@ -313,6 +394,7 @@ function createModeWorkspaceController({
     handleBookSegmentChange,
     handleModeTabClick,
     renderEmptyBookWorkspace,
+    renderEmptyMultiWorkspace,
     setActiveMode,
     setPaletteVisibility,
     updateModeSummary,

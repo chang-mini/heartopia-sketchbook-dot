@@ -1,0 +1,183 @@
+/* multi-sketchbook mode styles */
+
+/*
+ * The HTML `hidden` attribute should always collapse the element.
+ * forms.css sets `.field { display: grid }` which overrides the browser
+ * default `[hidden] { display: none }`, so multi-only fields remain visible
+ * in the sketchbook/book modes unless we force them here.
+ */
+.multi-range-field[hidden],
+#multi-piece-tab-bar[hidden],
+#multi-mosaic-view[hidden],
+.multi-split-overlay-layer[hidden],
+.expanded-multi-options[hidden],
+#expanded-multi-options[hidden] {
+  display: none !important;
+}
+
+/* Split overlay layer sits above the image, below the crop box */
+.multi-split-overlay-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.multi-split-line {
+  position: absolute;
+  background-color: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.55);
+  pointer-events: none;
+}
+
+.multi-split-line.vertical {
+  width: 2px;
+  transform: translateX(-1px);
+}
+
+.multi-split-line.horizontal {
+  height: 2px;
+  transform: translateY(-1px);
+}
+
+/* Sidebar fields */
+.multi-range-field select:disabled {
+  background: #eceadf;
+  color: #8c8572;
+  cursor: not-allowed;
+}
+
+/* Expanded modal options */
+.expanded-multi-options {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.expanded-multi-options .expanded-control-field {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.expanded-multi-options label {
+  font-size: 11px;
+  color: #a48f6a;
+}
+
+/* Piece tab bar above the guide viewport */
+.multi-piece-tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  background: #f7f1e3;
+  border: 1px solid #d9cfb6;
+  border-radius: 8px;
+}
+
+.multi-piece-tab {
+  /* Override the global `button { width: 100%; min-height: 52px }` rule
+     defined in forms.css so the tab buttons can sit inline. */
+  flex: 0 0 auto;
+  width: auto !important;
+  max-width: none !important;
+  min-width: 44px;
+  min-height: 0 !important;
+  padding: 6px 14px;
+  border: 1px solid #d9cfb6;
+  border-radius: 6px;
+  background: #fffaf0;
+  color: #5b4736;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.multi-piece-tab:hover {
+  background: #fce9c4;
+}
+
+.multi-piece-tab.is-active {
+  background: #e3a34a;
+  border-color: #c7892f;
+  color: #fff;
+  font-weight: 600;
+}
+
+.multi-piece-tab.is-overview {
+  background: #efe1c2;
+  font-weight: 600;
+}
+
+.multi-piece-tab.is-overview.is-active {
+  background: #6b8f54;
+  border-color: #547242;
+  color: #fff;
+}
+
+/* Mosaic overview view (overlaid inside guide-viewport).
+   Sized with its explicit aspect-ratio (set inline by the renderer) so each
+   cell naturally lands on the piece aspect. max-* keeps it inside the
+   viewport while margin auto centers it. */
+.multi-mosaic-view {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  max-width: calc(100% - 16px);
+  max-height: calc(100% - 16px);
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  background: #fffaf0;
+  z-index: 2;
+  overflow: hidden;
+}
+
+.multi-mosaic-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 1px solid #d9cfb6;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  min-height: 40px;
+  /* Each tile grid cell fills the available space (1fr × 1fr). */
+  width: 100%;
+  height: 100%;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+
+.multi-mosaic-tile:hover {
+  border-color: #c7892f;
+  transform: scale(1.01);
+}
+
+.multi-mosaic-tile canvas {
+  image-rendering: pixelated;
+  /* The tile itself is constrained to the piece aspect-ratio (inline style),
+     so we can safely stretch the canvas to fill every pixel of the cell. */
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  display: block;
+}
+
+.multi-mosaic-tile-label {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.85);
+  color: #5b4736;
+  border-radius: 3px;
+  pointer-events: none;
+}

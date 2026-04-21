@@ -34,6 +34,7 @@ function createCropInteractionController({
   computeResizedSelection,
   getCropPixelsForSelection,
   renderBookCropOverlays,
+  renderMultiSplitOverlays = () => {},
 }) {
   let cropInteraction = null;
   let cropLayoutRefreshHandle = null;
@@ -84,6 +85,7 @@ function createCropInteractionController({
   function renderCropSelection() {
     getVisibleCropViews().forEach((view) => renderCropSelectionOnView(view));
     renderBookCropOverlays();
+    renderMultiSplitOverlays();
   }
 
   function renderCropSelectionOnView(view) {

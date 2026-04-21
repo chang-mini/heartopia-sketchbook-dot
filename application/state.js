@@ -20,6 +20,8 @@ import {
   expandedCropImage,
   expandedCropMeta,
   expandedCropModal,
+  expandedMultiSplitOverlayLayer,
+  multiSplitOverlayLayer,
 } from "../infrastructure/browser/dom-elements.js";
 
 const viewerState = {
@@ -58,6 +60,8 @@ function createDefaultModeUiState() {
     activeGroup: null,
     multiSelectEnabled: false,
     rememberedMultiColorCodes: [],
+    pieces: [],
+    activePieceIndex: null,
   };
 }
 
@@ -70,6 +74,7 @@ const cropViews = {
     box: cropBox,
     meta: cropMeta,
     overlays: bookSegmentOverlays,
+    splitOverlay: multiSplitOverlayLayer,
   },
   expanded: {
     key: "expanded",
@@ -79,6 +84,7 @@ const cropViews = {
     box: expandedCropBox,
     meta: expandedCropMeta,
     overlays: expandedBookSegmentOverlays,
+    splitOverlay: expandedMultiSplitOverlayLayer,
   },
 };
 

@@ -54,6 +54,12 @@ function createSubmissionController({
   getIsCropStageExpanded,
   setCropStageExpanded,
   getTuningValues,
+  getMultiActiveLayout = () => null,
+  computeMultiPieceRects = () => [],
+  onMultiConversionStart = () => {},
+  onMultiPieceCompleted = () => {},
+  onMultiConversionFinished = () => {},
+  onMultiConversionFailed = () => {},
 }) {
   async function startConversion(event) {
     event?.preventDefault();
@@ -69,6 +75,10 @@ function createSubmissionController({
     if (!cropImage?.naturalWidth || !getCropSelection()) {
       renderError("원본 이미지를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.");
       return;
+    }
+
+    if (getActiveMode() === APP_MODES.MULTI_SKETCHBOOK) {
+      return startMultiConversion(file);
     }
 
     setSelectedFile(file);
@@ -178,6 +188,166 @@ function createSubmissionController({
     }
     if (!blob) {
       throw new Error("선택한 범위를 잘라내는 데 실패했습니다.");
+    }
+
+    const mimeType = blob.type || preferredType || "image/png";
+    return new File([blob], buildCroppedFilename(file.name, mimeType), {
+      type: mimeType,
+      lastModified: Date.now(),
+    });
+  }
+
+  async function startMultiConversion(file) {
+    const layout = getMultiActiveLayout();
+    if (!layout || layout.count <= 0) {
+      renderError("멀티스케치북 배치 정보를 확인할 수 없습니다.");
+      return;
+    }
+
+    const cropSelection = getCropSelection();
+    const pieceRects = computeMultiPieceRects(cropSelection, layout);
+    if (!Array.isArray(pieceRects) || pieceRects.length !== layout.count) {
+      renderError("조각 영역을 계산할 수 없습니다.");
+      return;
+    }
+
+    setSelectedFile(file);
+    renderSelectedFile();
+    stopTracking();
+    submitButton.disabled = true;
+    resetResultArea("멀티스케치북 도안 생성 결과를 준비하는 중입니다.");
+    setStatus("멀티 변환 준비 중", `총 ${layout.count}개 조각을 순차로 변환합니다.`, 4);
+
+    const ratio = ratioInput.value;
+    const precision = Number(precisionInput.value);
+    const tuning = getTuningValues?.() ?? null;
+    const collectedPieces = [];
+
+    onMultiConversionStart({
+      layout,
+      totalPieces: layout.count,
+      sourceFilename: file.name,
+      ratio,
+      precision,
+    });
+
+    try {
+      for (let i = 0; i < pieceRects.length; i += 1) {
+        const pieceRect = pieceRects[i];
+        const pieceIndex = i;
+        setPendingConversionContext({
+          mode: APP_MODES.MULTI_SKETCHBOOK,
+          pieceIndex,
+          totalPieces: layout.count,
+          multiLayout: layout,
+          bookSegmentId: null,
+          bookSegmentCrop: null,
+        });
+        setStatus(
+          "조각 변환 중",
+          `${pieceIndex + 1}/${layout.count} 조각을 처리하고 있습니다.`,
+          Math.round(((pieceIndex) / layout.count) * 95) + 5,
+        );
+
+        const uploadFile = await buildMultiPieceUploadFile(file, pieceRect);
+        const snapshot = await convertImageLocally({
+          file: uploadFile,
+          originalName: `${stripExt(file.name)}_p${pieceIndex + 1}`,
+          ratio,
+          precision,
+          canvasWidth: null,
+          canvasHeight: null,
+          tuning,
+        });
+        setActiveJobId(snapshot.job_id);
+        collectedPieces.push(snapshot);
+        onMultiPieceCompleted({ pieceIndex, snapshot });
+      }
+
+      setStatus("완료", `${layout.count}개 조각 변환이 모두 끝났습니다.`, 100);
+      onMultiConversionFinished({
+        layout,
+        pieces: collectedPieces,
+        sourceFilename: file.name,
+        ratio,
+        precision,
+      });
+      finishTracking();
+    } catch (error) {
+      if (savedStatus) {
+        savedStatus.hidden = true;
+        savedStatus.textContent = "";
+      }
+      if (savedFileInput) {
+        savedFileInput.value = "";
+      }
+      renderError(error instanceof Error ? error.message : "멀티 변환에 실패했습니다. 다시 시도해 주세요.");
+      onMultiConversionFailed(error);
+      finishTracking();
+    }
+  }
+
+  function stripExt(name) {
+    if (typeof name !== "string") return "piece";
+    const dot = name.lastIndexOf(".");
+    return dot > 0 ? name.slice(0, dot) : name;
+  }
+
+  async function buildMultiPieceUploadFile(file, pieceRect) {
+    const cropPixels = getCropPixels();
+    const naturalImage = getNaturalCropImageElement();
+    if (!cropPixels) {
+      throw new Error("크롭 영역을 계산할 수 없습니다.");
+    }
+    if (!naturalImage?.naturalWidth) {
+      throw new Error("원본 이미지를 찾을 수 없습니다.");
+    }
+
+    const cropSelection = getCropSelection();
+    if (!cropSelection) {
+      throw new Error("크롭 선택 영역이 없습니다.");
+    }
+
+    const naturalWidth = naturalImage.naturalWidth;
+    const naturalHeight = naturalImage.naturalHeight;
+
+    let sourceLeft = Math.round(pieceRect.x * naturalWidth);
+    let sourceTop = Math.round(pieceRect.y * naturalHeight);
+    let sourceWidth = Math.max(1, Math.round(pieceRect.width * naturalWidth));
+    let sourceHeight = Math.max(1, Math.round(pieceRect.height * naturalHeight));
+    if (sourceLeft + sourceWidth > naturalWidth) sourceWidth = naturalWidth - sourceLeft;
+    if (sourceTop + sourceHeight > naturalHeight) sourceHeight = naturalHeight - sourceTop;
+    sourceWidth = Math.max(1, sourceWidth);
+    sourceHeight = Math.max(1, sourceHeight);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = sourceWidth;
+    canvas.height = sourceHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("조각 캔버스를 만들 수 없습니다.");
+    }
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(
+      naturalImage,
+      sourceLeft,
+      sourceTop,
+      sourceWidth,
+      sourceHeight,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+
+    const preferredType = getPreferredUploadType(file.type);
+    let blob = await canvasToBlob(canvas, preferredType);
+    if (!blob && preferredType !== "image/png") {
+      blob = await canvasToBlob(canvas, "image/png");
+    }
+    if (!blob) {
+      throw new Error("조각을 잘라내는 데 실패했습니다.");
     }
 
     const mimeType = blob.type || preferredType || "image/png";

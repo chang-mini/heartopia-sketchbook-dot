@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>두근두근타운 스케치북</title>
   <link rel="icon" type="image/png" href="./favicon.png?v=20260319-favicon-1">
-  <link rel='stylesheet' href='./styles/main.css?v=20260421-tuning-3'>
+  <link rel='stylesheet' href='./styles/main.css?v=20260421-multi-10'>
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-CESZZXVJ33"></script>
   <script>
@@ -69,6 +69,20 @@
                   <option value="full">전체</option>
                 </select>
               </div>
+              <div class="field multi-range-field" id="multi-range-field" hidden>
+                <label for="multi-split-count">분할 수</label>
+                <select id="multi-split-count">
+                  <option value="2">2</option>
+                  <option value="4" selected>4</option>
+                  <option value="6">6</option>
+                  <option value="8">8</option>
+                  <option value="10">10</option>
+                </select>
+              </div>
+              <div class="field multi-range-field" id="multi-layout-field" hidden>
+                <label for="multi-layout">배치</label>
+                <select id="multi-layout"></select>
+              </div>
               <button id="submit-button" type="button">도안 생성 시작</button>
             </form>
           </section>
@@ -122,6 +136,7 @@
                 <div class="crop-frame" id="crop-frame" data-crop-view="sidebar">
                   <img class="crop-image" id="crop-image" alt="업로드한 사진 미리보기">
                   <div class="book-segment-overlays" id="book-segment-overlays" hidden></div>
+                  <div class="multi-split-overlay-layer" id="multi-split-overlay-layer" hidden></div>
                   <div class="crop-box" id="crop-box" data-crop-view="sidebar" hidden>
                     <div class="crop-guides"></div>
                     <span class="crop-handle handle-nw" data-handle="nw"></span>
@@ -150,6 +165,8 @@
                 role="tab" aria-selected="true">스케치북</button>
               <button class="mode-tab" id="mode-tab-book" data-mode-tab="book" type="button" role="tab"
                 aria-selected="false">책</button>
+              <button class="mode-tab" id="mode-tab-multi-sketchbook" data-mode-tab="multi_sketchbook" type="button"
+                role="tab" aria-selected="false">멀티스케치북</button>
             </div>
           </div>
           <p class="note mode-summary" id="mode-summary"></p>
@@ -203,9 +220,11 @@
               </div>
             </div>
           </div>
+          <div class="multi-piece-tab-bar" id="multi-piece-tab-bar" hidden role="tablist" aria-label="조각 탭"></div>
           <div class="guide-viewport" id="guide-viewport">
             <button class="guide-fullscreen-close" id="guide-fullscreen-close" type="button">&times;</button>
             <canvas class="guide-canvas" id="guide-canvas"></canvas>
+            <div class="multi-mosaic-view" id="multi-mosaic-view" hidden></div>
             <div class="guide-empty" id="guide-empty">
               <div class="empty-card">
                 <strong>작업 상태</strong>
@@ -313,6 +332,22 @@
               <option value="full">전체</option>
             </select>
           </div>
+          <div class="expanded-multi-options" id="expanded-multi-options" hidden>
+            <div class="expanded-control-field">
+              <label for="expanded-multi-split-count">분할</label>
+              <select class="expanded-crop-select compact" id="expanded-multi-split-count">
+                <option value="2">2</option>
+                <option value="4" selected>4</option>
+                <option value="6">6</option>
+                <option value="8">8</option>
+                <option value="10">10</option>
+              </select>
+            </div>
+            <div class="expanded-control-field">
+              <label for="expanded-multi-layout">배치</label>
+              <select class="expanded-crop-select" id="expanded-multi-layout"></select>
+            </div>
+          </div>
           <button class="ghost-button crop-action-button" id="expanded-reset-crop" type="button">가운데 맞춤</button>
           <button class="ghost-button crop-action-button" id="expanded-full-crop" type="button">전체선택</button>
           <button class="ghost-button crop-action-button crop-expand-button" id="expanded-close-crop"
@@ -325,6 +360,7 @@
         <div class="crop-frame" id="expanded-crop-frame" data-crop-view="expanded">
           <img class="crop-image" id="expanded-crop-image" alt="업로드한 사진 확대 미리보기">
           <div class="book-segment-overlays" id="expanded-book-segment-overlays" hidden></div>
+          <div class="multi-split-overlay-layer" id="expanded-multi-split-overlay-layer" hidden></div>
           <div class="crop-box" id="expanded-crop-box" data-crop-view="expanded" hidden>
             <div class="crop-guides"></div>
             <span class="crop-handle handle-nw" data-handle="nw"></span>
@@ -337,7 +373,7 @@
     </div>
   </div>
   <script src="./infrastructure/vendor/pyodide.js?v=20260319-modular-3"></script>
-  <script type="module" src="./application/main.js?v=20260421-tuning-3"></script>
+  <script type="module" src="./application/main.js?v=20260421-multi-10"></script>
 </body>
 
 </html>

@@ -20,9 +20,14 @@ function createViewerInfoController({
   getActiveMode,
   getSelectedBookSegmentId,
   getCurrentResultSnapshot,
+  getCurrentMultiSnapshot = () => null,
 }) {
   function isBookCanvasMode() {
     return getActiveMode() === APP_MODES.BOOK;
+  }
+
+  function isMultiCanvasMode() {
+    return getActiveMode() === APP_MODES.MULTI_SKETCHBOOK;
   }
 
   function getActiveColorProgressText() {
@@ -41,6 +46,19 @@ function createViewerInfoController({
   }
 
   function updateViewerNote() {
+    if (isMultiCanvasMode()) {
+      const multi = getCurrentMultiSnapshot();
+      if (multi?.layout) {
+        const idx = multi.activePieceIndex;
+        if (idx === null || idx === undefined) {
+          viewerNote.textContent = `전체 미리보기 · ${multi.layout.count}조각 (${multi.layout.rows}×${multi.layout.cols}) — 타일을 클릭하면 해당 조각으로 이동합니다.`;
+        } else {
+          viewerNote.textContent = `${idx + 1}분면 작업 중 · 총 ${multi.layout.count}조각 중 ${idx + 1}번째${getActiveColorProgressText()}`;
+        }
+        return;
+      }
+    }
+
     if (!viewerState.rows || !viewerState.columns) {
       return;
     }

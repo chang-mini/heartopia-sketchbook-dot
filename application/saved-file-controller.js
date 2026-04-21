@@ -2,11 +2,13 @@
 Module: saved file controller
 Description: Saved snapshot file loading, validation, and application orchestration.
 Domain: application
-Dependencies: browser File API
+Dependencies: browser File API, ../domain/snapshot/portable.js
 Usage:
   const savedFileController = createSavedFileController({...});
   savedFileInput.addEventListener("change", savedFileController.handleSavedFileSelection);
 */
+
+import { isMultiBundleSnapshot } from "../domain/snapshot/portable.js";
 
 function createSavedFileController({
   APP_MODES,
@@ -23,6 +25,7 @@ function createSavedFileController({
   applyModeSnapshot,
   setStatus,
   setActiveModeValue,
+  applyMultiBundleSnapshot = null,
 }) {
   function handleSavedFileSelection(event) {
     const file = event.target.files?.[0];
@@ -42,6 +45,17 @@ function createSavedFileController({
       if (!isPortableSnapshot(snapshot)) {
         throw new Error("지원하지 않는 저장 파일 형식입니다.");
       }
+
+      if (isMultiBundleSnapshot(snapshot) && typeof applyMultiBundleSnapshot === "function") {
+        stopTracking();
+        persistCurrentSnapshotByMode();
+        persistCurrentModeUiState();
+        applyMultiBundleSnapshot(snapshot, extractSavedUiState(payload), file.name);
+        setStatus("저장본 불러옴", `"${file.name}" 멀티스케치북 번들을 복원했습니다.`, 100);
+        clearSavedStatus();
+        return;
+      }
+
       primeModeUiStateForSnapshot(snapshot, extractSavedUiState(payload));
       applyImportedConversion(snapshot, file.name);
     } catch {
