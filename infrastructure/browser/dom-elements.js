@@ -98,6 +98,20 @@ const multiSplitOverlayLayer = document.getElementById("multi-split-overlay-laye
 const expandedMultiSplitOverlayLayer = document.getElementById("expanded-multi-split-overlay-layer");
 const multiPieceTabBar = document.getElementById("multi-piece-tab-bar");
 const multiMosaicView = document.getElementById("multi-mosaic-view");
+const clothesItemField = document.getElementById("clothes-item-field");
+const clothesItemInput = document.getElementById("clothes-item");
+const clothesCanvasField = document.getElementById("clothes-canvas-field");
+const clothesCanvasInput = document.getElementById("clothes-canvas");
+const furnitureItemField = document.getElementById("furniture-item-field");
+const furnitureItemInput = document.getElementById("furniture-item");
+const furnitureCanvasField = document.getElementById("furniture-canvas-field");
+const furnitureCanvasInput = document.getElementById("furniture-canvas");
+const expandedClothesCanvasWrap = document.getElementById("expanded-clothes-canvas-wrap");
+const expandedClothesCanvasInput = document.getElementById("expanded-clothes-canvas");
+const expandedFurnitureCanvasWrap = document.getElementById("expanded-furniture-canvas-wrap");
+const expandedFurnitureCanvasInput = document.getElementById("expanded-furniture-canvas");
+const templateMaskOverlay = document.getElementById("template-mask-overlay");
+const expandedTemplateMaskOverlay = document.getElementById("expanded-template-mask-overlay");
 
 export {
   bookRangeField,
@@ -191,4 +205,18 @@ export {
   expandedMultiSplitOverlayLayer,
   multiPieceTabBar,
   multiMosaicView,
+  clothesItemField,
+  clothesItemInput,
+  clothesCanvasField,
+  clothesCanvasInput,
+  furnitureItemField,
+  furnitureItemInput,
+  furnitureCanvasField,
+  furnitureCanvasInput,
+  expandedClothesCanvasWrap,
+  expandedClothesCanvasInput,
+  expandedFurnitureCanvasWrap,
+  expandedFurnitureCanvasInput,
+  templateMaskOverlay,
+  expandedTemplateMaskOverlay,
 };

@@ -39,6 +39,12 @@ function createConversionSessionController({
   setActiveJobId,
   setPollingHandle,
   setSubmitEnabled,
+  applyMaskToGridCodes = (g) => g,
+  embedBBoxGridIntoCanvas = null,
+  computeMaskBBox = null,
+  getTemplateSnapshot = () => null,
+  setTemplateSnapshot = () => {},
+  buildTemplateCanvasSnapshot = () => null,
 }) {
   function createIdlePendingContext() {
     return {
@@ -63,7 +69,9 @@ function createConversionSessionController({
       height: snapshot.height,
       used_colors: Array.isArray(snapshot.used_colors) ? snapshot.used_colors : [],
       grid_codes: Array.isArray(snapshot.grid_codes) ? snapshot.grid_codes : [],
-      canvas_mode: snapshot.canvas_mode === APP_MODES.BOOK ? APP_MODES.BOOK : APP_MODES.SKETCHBOOK,
+      canvas_mode: [APP_MODES.BOOK, APP_MODES.CLOTHES, APP_MODES.FURNITURE].includes(snapshot.canvas_mode)
+        ? snapshot.canvas_mode
+        : APP_MODES.SKETCHBOOK,
       book_selected_segment: snapshot.book_selected_segment || getSelectedBookSegmentId(),
       book_applied_segments: normalizeBookAppliedSegments(snapshot.book_applied_segments),
       book_segment_crops: normalizeBookSegmentCrops(snapshot.book_segment_crops),
@@ -75,6 +83,9 @@ function createConversionSessionController({
     const pendingConversionContext = getPendingConversionContext();
 
     if (snapshot.status === "completed") {
+      const isTemplateConversion = pendingConversionContext.mode === APP_MODES.CLOTHES
+        || pendingConversionContext.mode === APP_MODES.FURNITURE;
+
       if (pendingConversionContext.mode === APP_MODES.BOOK) {
         const currentBookSnapshot = getBookSnapshot();
         const currentResultSnapshot = getCurrentResultSnapshot();
@@ -102,6 +113,30 @@ function createConversionSessionController({
         setBookSnapshot(nextBookSnapshot);
         if (getActiveMode() === APP_MODES.BOOK) {
           setCurrentResultSnapshot(nextBookSnapshot);
+        }
+      } else if (isTemplateConversion) {
+        const tCanvas = pendingConversionContext.templateCanvas;
+        let maskedGridCodes;
+        if (tCanvas?.maskLines && embedBBoxGridIntoCanvas && computeMaskBBox) {
+          const bbox = computeMaskBBox(tCanvas.maskLines, tCanvas.w, tCanvas.h);
+          maskedGridCodes = embedBBoxGridIntoCanvas(snapshot.grid_codes, bbox, tCanvas.w, tCanvas.h, tCanvas.maskLines);
+        } else {
+          maskedGridCodes = tCanvas?.maskLines
+            ? applyMaskToGridCodes(snapshot.grid_codes, tCanvas.maskLines)
+            : snapshot.grid_codes;
+        }
+        const nextCanvasSnapshot = buildTemplateCanvasSnapshot(
+          pendingConversionContext.mode,
+          tCanvas,
+          maskedGridCodes,
+          snapshot,
+          pendingConversionContext.templateCrop,
+        );
+        if (nextCanvasSnapshot) {
+          setTemplateSnapshot(pendingConversionContext.mode, nextCanvasSnapshot);
+          if (getActiveMode() === pendingConversionContext.mode) {
+            setCurrentResultSnapshot(nextCanvasSnapshot);
+          }
         }
       } else {
         const nextSketchbookSnapshot = buildPortableSnapshot({

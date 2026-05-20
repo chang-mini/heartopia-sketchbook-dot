@@ -60,6 +60,10 @@ function createSubmissionController({
   onMultiPieceCompleted = () => {},
   onMultiConversionFinished = () => {},
   onMultiConversionFailed = () => {},
+  getSelectedTemplateCanvas = () => null,
+  getSelectedTemplateBBox = () => null,
+  isTemplateMode = () => false,
+  buildCurrentTemplateCrop = () => null,
 }) {
   async function startConversion(event) {
     event?.preventDefault();
@@ -85,16 +89,21 @@ function createSubmissionController({
     renderSelectedFile();
     stopTracking();
     submitButton.disabled = true;
+    const currentMode = getActiveMode();
     setPendingConversionContext({
-      mode: getActiveMode(),
-      bookSegmentId: getActiveMode() === APP_MODES.BOOK ? getSelectedBookSegmentId() : null,
-      bookSegmentCrop: getActiveMode() === APP_MODES.BOOK ? buildCurrentBookSegmentCrop() : null,
+      mode: currentMode,
+      bookSegmentId: currentMode === APP_MODES.BOOK ? getSelectedBookSegmentId() : null,
+      bookSegmentCrop: currentMode === APP_MODES.BOOK ? buildCurrentBookSegmentCrop() : null,
+      templateCanvas: isTemplateMode() ? getSelectedTemplateCanvas() : null,
+      templateCrop: isTemplateMode() ? buildCurrentTemplateCrop() : null,
     });
-    if (getActiveMode() === APP_MODES.BOOK && getBookSnapshot()) {
+    if (currentMode === APP_MODES.BOOK && getBookSnapshot()) {
       setGuideMessage("선택한 책 범위를 새 이미지로 덮어쓰는 중입니다.");
-    } else if (getActiveMode() === APP_MODES.BOOK) {
+    } else if (currentMode === APP_MODES.BOOK) {
       renderEmptyBookWorkspace();
       setGuideMessage("책 범위를 변환하는 중입니다.");
+    } else if (isTemplateMode()) {
+      resetResultArea("선택한 파트의 도안을 생성하는 중입니다.");
     } else {
       resetResultArea("도안 생성 결과를 준비하는 중입니다.");
     }
@@ -102,14 +111,20 @@ function createSubmissionController({
 
     try {
       const uploadFile = await buildUploadFile(file);
-      const ratio = getActiveMode() === APP_MODES.BOOK ? BOOK_LAYOUT.ratio : ratioInput.value;
-      const precision = getActiveMode() === APP_MODES.BOOK ? BOOK_LAYOUT.precision : Number(precisionInput.value);
+      const ratio = currentMode === APP_MODES.BOOK ? BOOK_LAYOUT.ratio : ratioInput.value;
+      const precision = currentMode === APP_MODES.BOOK ? BOOK_LAYOUT.precision : Number(precisionInput.value);
       let canvasWidth = null;
       let canvasHeight = null;
-      if (getActiveMode() === APP_MODES.BOOK) {
+      if (currentMode === APP_MODES.BOOK) {
         const bookSegment = getBookSegment(getSelectedBookSegmentId());
         canvasWidth = bookSegment.width;
         canvasHeight = BOOK_LAYOUT.usableHeight;
+      } else if (isTemplateMode()) {
+        const bbox = getSelectedTemplateBBox();
+        if (bbox) {
+          canvasWidth = bbox.w;
+          canvasHeight = bbox.h;
+        }
       }
       const snapshot = await convertImageLocally({
         file: uploadFile,

@@ -32,6 +32,8 @@ function createModeSnapshotController({
   setSelectedBookSegmentId,
   setBookSnapshot,
   setSketchbookSnapshot,
+  setClothesSnapshot = () => {},
+  setFurnitureSnapshot = () => {},
   applyModeUi,
   renderCompleted,
   updateSaveButtonState,
@@ -68,7 +70,8 @@ function createModeSnapshotController({
       return null;
     }
 
-    const mode = snapshot.canvas_mode === APP_MODES.BOOK ? APP_MODES.BOOK : APP_MODES.SKETCHBOOK;
+    const knownModes = [APP_MODES.BOOK, APP_MODES.CLOTHES, APP_MODES.FURNITURE];
+    const mode = knownModes.includes(snapshot.canvas_mode) ? snapshot.canvas_mode : APP_MODES.SKETCHBOOK;
     return `${mode}|${snapshot.job_id || ""}|${snapshot.filename || ""}|${snapshot.width || 0}x${snapshot.height || 0}`;
   }
 
@@ -91,7 +94,7 @@ function createModeSnapshotController({
       return;
     }
 
-    const modeKey = currentResultSnapshot.canvas_mode === APP_MODES.BOOK ? APP_MODES.BOOK : APP_MODES.SKETCHBOOK;
+    const modeKey = [APP_MODES.BOOK, APP_MODES.CLOTHES, APP_MODES.FURNITURE].includes(currentResultSnapshot.canvas_mode) ? currentResultSnapshot.canvas_mode : APP_MODES.SKETCHBOOK;
     modeUiStates[modeKey] = {
       snapshotKey,
       state: captureCurrentModeUiState(),
@@ -104,7 +107,7 @@ function createModeSnapshotController({
       return;
     }
 
-    const modeKey = snapshot.canvas_mode === APP_MODES.BOOK ? APP_MODES.BOOK : APP_MODES.SKETCHBOOK;
+    const modeKey = [APP_MODES.BOOK, APP_MODES.CLOTHES, APP_MODES.FURNITURE].includes(snapshot.canvas_mode) ? snapshot.canvas_mode : APP_MODES.SKETCHBOOK;
     const stored = modeUiStates[modeKey];
     const nextState = stored?.snapshotKey === snapshotKey ? stored.state : createDefaultModeUiState();
     const validCodes = new Set(viewerState.paletteByCode.keys());
@@ -172,7 +175,7 @@ function createModeSnapshotController({
       return;
     }
 
-    const modeKey = snapshot.canvas_mode === APP_MODES.BOOK ? APP_MODES.BOOK : APP_MODES.SKETCHBOOK;
+    const modeKey = [APP_MODES.BOOK, APP_MODES.CLOTHES, APP_MODES.FURNITURE].includes(snapshot.canvas_mode) ? snapshot.canvas_mode : APP_MODES.SKETCHBOOK;
     modeUiStates[modeKey] = {
       snapshotKey,
       state: normalizeModeUiState(uiState),
@@ -190,6 +193,14 @@ function createModeSnapshotController({
       setBookSnapshot(portableSnapshot);
       return;
     }
+    if (portableSnapshot.canvas_mode === APP_MODES.CLOTHES) {
+      setClothesSnapshot(portableSnapshot);
+      return;
+    }
+    if (portableSnapshot.canvas_mode === APP_MODES.FURNITURE) {
+      setFurnitureSnapshot(portableSnapshot);
+      return;
+    }
     setSketchbookSnapshot(portableSnapshot);
   }
 
@@ -203,6 +214,10 @@ function createModeSnapshotController({
     if (portableSnapshot.canvas_mode === APP_MODES.BOOK) {
       setSelectedBookSegmentId(portableSnapshot.book_selected_segment || getSelectedBookSegmentId());
       setBookSnapshot(portableSnapshot);
+    } else if (portableSnapshot.canvas_mode === APP_MODES.CLOTHES) {
+      setClothesSnapshot(portableSnapshot);
+    } else if (portableSnapshot.canvas_mode === APP_MODES.FURNITURE) {
+      setFurnitureSnapshot(portableSnapshot);
     } else {
       setSketchbookSnapshot(portableSnapshot);
     }

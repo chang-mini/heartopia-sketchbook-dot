@@ -17,6 +17,7 @@ function createGuideCanvasController({
   getGuideGridColor,
   getActiveMode,
   getCurrentResultSnapshot,
+  getTemplateMaskLines = () => null,
   ratioInput,
   precisionInput,
   getBookSegment,
@@ -281,6 +282,7 @@ function createGuideCanvasController({
     if (isBookCanvasMode()) {
       drawBookBoundaryLines(cellSize, startRow, endRow);
     }
+    drawTemplateMaskBoundary(cellSize);
     drawHoveredCell(cellSize);
   }
 
@@ -413,6 +415,41 @@ function createGuideCanvasController({
       guideContext.strokeStyle = "rgba(96, 68, 51, .62)";
       guideContext.stroke();
     }
+    guideContext.restore();
+  }
+
+  function drawTemplateMaskBoundary(cellSize) {
+    const mode = getActiveMode();
+    if (mode !== APP_MODES.CLOTHES && mode !== APP_MODES.FURNITURE) {
+      return;
+    }
+
+    const maskLines = getTemplateMaskLines();
+    if (!maskLines?.length) {
+      return;
+    }
+
+    guideContext.save();
+    guideContext.strokeStyle = "rgba(200, 60, 40, .85)";
+    guideContext.lineWidth = Math.max(2.5, cellSize * 0.15);
+    guideContext.setLineDash([Math.max(4, cellSize * 0.4), Math.max(3, cellSize * 0.25)]);
+
+    for (const polygon of maskLines) {
+      if (polygon.length < 2) continue;
+      guideContext.beginPath();
+      for (let i = 0; i < polygon.length; i += 1) {
+        const px = viewerState.panX + (polygon[i].x * cellSize);
+        const py = viewerState.panY + (polygon[i].y * cellSize);
+        if (i === 0) {
+          guideContext.moveTo(px, py);
+        } else {
+          guideContext.lineTo(px, py);
+        }
+      }
+      guideContext.closePath();
+      guideContext.stroke();
+    }
+
     guideContext.restore();
   }
 

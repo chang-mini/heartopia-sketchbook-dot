@@ -19,6 +19,8 @@ function createCropRatioController({
   getActiveMode,
   getSelectedBookSegmentId,
   getMultiLayout = () => null,
+  getTemplateCropRatio = () => 1,
+  getTemplateCropRatioLabel = () => "1:1",
 }) {
   function getSketchbookPieceRatio() {
     const ratio = ratioInput.value;
@@ -38,6 +40,10 @@ function createCropRatioController({
       return segment.width / BOOK_LAYOUT.usableHeight;
     }
 
+    if (getActiveMode() === APP_MODES.CLOTHES || getActiveMode() === APP_MODES.FURNITURE) {
+      return getTemplateCropRatio();
+    }
+
     if (getActiveMode() === APP_MODES.MULTI_SKETCHBOOK) {
       const layout = getMultiLayout();
       return computeOverallCropRatio(getSketchbookPieceRatio(), layout);
@@ -50,6 +56,10 @@ function createCropRatioController({
     if (getActiveMode() === APP_MODES.BOOK) {
       const segment = getBookSegment(getSelectedBookSegmentId());
       return `${segment.width}:${BOOK_LAYOUT.usableHeight}`;
+    }
+
+    if (getActiveMode() === APP_MODES.CLOTHES || getActiveMode() === APP_MODES.FURNITURE) {
+      return getTemplateCropRatioLabel();
     }
 
     if (getActiveMode() === APP_MODES.MULTI_SKETCHBOOK) {

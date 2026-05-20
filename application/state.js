@@ -22,6 +22,8 @@ import {
   expandedCropModal,
   expandedMultiSplitOverlayLayer,
   multiSplitOverlayLayer,
+  templateMaskOverlay,
+  expandedTemplateMaskOverlay,
 } from "../infrastructure/browser/dom-elements.js";
 
 const viewerState = {
@@ -74,6 +76,7 @@ const cropViews = {
     box: cropBox,
     meta: cropMeta,
     overlays: bookSegmentOverlays,
+    templateMaskOverlay: templateMaskOverlay,
     splitOverlay: multiSplitOverlayLayer,
   },
   expanded: {
@@ -84,6 +87,7 @@ const cropViews = {
     box: expandedCropBox,
     meta: expandedCropMeta,
     overlays: expandedBookSegmentOverlays,
+    templateMaskOverlay: expandedTemplateMaskOverlay,
     splitOverlay: expandedMultiSplitOverlayLayer,
   },
 };

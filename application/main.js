@@ -7,6 +7,7 @@
   PALETTE_BY_CODE,
 } from "../config/app-constants.js";
 import { CANVAS_PRESETS } from "../config/catalog.js";
+import { getTemplatePreset, getTemplateCanvas } from "../config/template-catalog.js";
 import {
   bookRangeField,
   bookSegmentInput,
@@ -97,6 +98,18 @@ import {
   multiMosaicView,
   multiSplitOverlayLayer,
   expandedMultiSplitOverlayLayer,
+  clothesItemField,
+  clothesItemInput,
+  clothesCanvasField,
+  clothesCanvasInput,
+  furnitureItemField,
+  furnitureItemInput,
+  furnitureCanvasField,
+  furnitureCanvasInput,
+  expandedClothesCanvasWrap,
+  expandedClothesCanvasInput,
+  expandedFurnitureCanvasWrap,
+  expandedFurnitureCanvasInput,
 } from "../infrastructure/browser/dom-elements.js";
 import { buildCroppedFilename, canvasToBlob, getPreferredUploadType, triggerFileDownload } from "../infrastructure/browser/files.js";
 import { createPyodideConverter } from "../infrastructure/pyodide/runtime.js";
@@ -117,7 +130,10 @@ import { createMosaicRenderer } from "../domain/multi/mosaic.js";
 import { computePieceRects, getDefaultLayoutForCount } from "../domain/multi/layout.js";
 import { buildMultiBundleFilename, buildMultiPieceFilename } from "../domain/multi/filename.js";
 import { buildMultiBundleSnapshot } from "../domain/multi/bundle.js";
+import { createTemplateMaskOverlayRenderer } from "../domain/crop/template-overlays.js";
 import { createMultiSketchbookController } from "./multi-sketchbook-controller.js";
+import { createTemplateController } from "./template-controller.js";
+import { applyMaskToGridCodes, computeMaskBBox, embedBBoxGridIntoCanvas, normalizeTemplateAppliedCanvases, normalizeTemplateCanvasCrops, normalizeStoredTemplateCrop } from "../domain/template/grid.js";
 import { createCropInteractionController } from "../domain/crop/interactions.js";
 import { createCropSelectionController } from "../domain/crop/selection.js";
 import { createCropWorkspaceController } from "../domain/crop/workspace.js";
@@ -166,6 +182,8 @@ let guideGridColor = DEFAULT_GUIDE_GRID_COLOR;
 let pendingConversionContext = { mode: APP_MODES.SKETCHBOOK, bookSegmentId: null, bookSegmentCrop: null, pieceIndex: null, totalPieces: null, multiLayout: null };
 let sketchbookSnapshot = null;
 let bookSnapshot = null;
+let clothesSnapshot = null;
+let furnitureSnapshot = null;
 let currentMultiSnapshot = null;
 let multiController = null;
 let submissionController = null;
@@ -179,6 +197,14 @@ const modeUiStates = {
     state: createDefaultModeUiState(),
   },
   [APP_MODES.MULTI_SKETCHBOOK]: {
+    snapshotKey: null,
+    state: createDefaultModeUiState(),
+  },
+  [APP_MODES.CLOTHES]: {
+    snapshotKey: null,
+    state: createDefaultModeUiState(),
+  },
+  [APP_MODES.FURNITURE]: {
     snapshotKey: null,
     state: createDefaultModeUiState(),
   },
@@ -237,6 +263,8 @@ const {
   getActiveMode: () => activeMode,
   getSelectedBookSegmentId: () => selectedBookSegmentId,
   getMultiLayout: () => multiController?.getActiveLayout() || null,
+  getTemplateCropRatio: () => templateController?.getTemplateCropRatio() ?? 1,
+  getTemplateCropRatioLabel: () => templateController?.getTemplateCropRatioLabel() ?? "1:1",
 });
 const {
   buildDisplayCropRect,
@@ -279,6 +307,16 @@ const { renderBookCropOverlays } = createBookCropOverlayRenderer({
   getBookFullGuideSegments,
   normalizeBookAppliedSegments,
   normalizeBookSegmentCrops,
+});
+const { renderTemplateMaskOverlays } = createTemplateMaskOverlayRenderer({
+  APP_MODES,
+  getVisibleCropViews,
+  getNaturalCropImageElement,
+  getActiveMode: () => activeMode,
+  getCropDisplayMetrics,
+  getCropSelectionForView,
+  getCropSelection: () => cropSelection,
+  getSelectedTemplateCanvas: () => templateController?.getSelectedCanvas() ?? null,
 });
 const { renderMultiSplitOverlays } = createMultiSplitOverlayRenderer({
   APP_MODES,
@@ -326,6 +364,22 @@ multiController = createMultiSketchbookController({
     handleMultiPieceTabChange(nextIndex);
   },
 });
+const templateController = createTemplateController({
+  APP_MODES,
+  clothesItemInput,
+  clothesCanvasInput,
+  furnitureItemInput,
+  furnitureCanvasInput,
+  expandedClothesCanvasInput,
+  expandedFurnitureCanvasInput,
+  getActiveMode: () => activeMode,
+  onCanvasChanged: () => {
+    if (templateController?.isTemplateMode() && cropImage?.naturalWidth) {
+      applyDefaultCropSelection();
+      renderTemplateMaskOverlays();
+    }
+  },
+});
 const {
   applyDefaultCropSelection,
   getCropPixels,
@@ -367,6 +421,7 @@ const {
   getCropPixelsForSelection,
   renderBookCropOverlays,
   renderMultiSplitOverlays,
+  renderTemplateMaskOverlays,
 });
   // -- Palette --
 const {
@@ -519,6 +574,37 @@ const {
   setSubmitEnabled: (enabled) => {
     submitButton.disabled = !enabled;
   },
+  applyMaskToGridCodes,
+  embedBBoxGridIntoCanvas,
+  computeMaskBBox,
+  getTemplateSnapshot: (mode) => mode === APP_MODES.CLOTHES ? clothesSnapshot : furnitureSnapshot,
+  setTemplateSnapshot: (mode, snapshot) => {
+    if (mode === APP_MODES.CLOTHES) clothesSnapshot = snapshot;
+    else furnitureSnapshot = snapshot;
+  },
+  buildTemplateCanvasSnapshot: (mode, tCanvas, maskedGridCodes, snapshot, tCrop) => {
+    if (!tCanvas) return null;
+    return {
+      job_id: `template-${Date.now()}`,
+      filename: selectedFile?.name || snapshot.filename || "template.png",
+      ratio: `${tCanvas.w}:${tCanvas.h}`,
+      precision: 1,
+      width: tCanvas.w,
+      height: tCanvas.h,
+      status: "completed",
+      progress: 100,
+      message: "템플릿 도안",
+      created_at: snapshot.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      used_colors: buildUsedColorsFromGrid(maskedGridCodes),
+      grid_codes: maskedGridCodes,
+      canvas_mode: mode,
+      template_item_id: templateController?.getSelectedItemId() || null,
+      template_canvas_id: tCanvas.id,
+      template_applied_canvases: [tCanvas.id],
+      template_canvas_crops: tCrop ? { [tCanvas.id]: tCrop } : {},
+    };
+  },
 });
   // -- Pyodide converter --
 const { convertImageLocally } = createPyodideConverter({ setStatus });
@@ -543,6 +629,10 @@ const {
   getGuideGridColor: () => guideGridColor,
   getActiveMode: () => activeMode,
   getCurrentResultSnapshot: () => currentResultSnapshot,
+  getTemplateMaskLines: () => {
+    const canvas = templateController?.getSelectedCanvas();
+    return canvas?.maskLines || null;
+  },
   ratioInput,
   precisionInput,
   getBookSegment,
@@ -715,6 +805,8 @@ const {
 } = createModeWorkspaceController({
   APP_MODES,
   BOOK_LAYOUT,
+  cropFrame,
+  expandedCropFrame,
   cropImage,
   submitButton,
   ratioInput,
@@ -737,6 +829,12 @@ const {
   multiMosaicView,
   multiSplitOverlayLayer,
   expandedMultiSplitOverlayLayer,
+  clothesItemField,
+  clothesCanvasField,
+  furnitureItemField,
+  furnitureCanvasField,
+  expandedClothesCanvasWrap,
+  expandedFurnitureCanvasWrap,
   createEmptyGridCodes,
   buildUsedColorsFromGrid,
   normalizeBookAppliedSegments,
@@ -794,6 +892,23 @@ const {
     currentMultiSnapshot = snapshot;
   },
   getCropSelection: () => cropSelection,
+  getClothesSnapshot: () => clothesSnapshot,
+  getFurnitureSnapshot: () => furnitureSnapshot,
+  isTemplateMode: () => templateController?.isTemplateMode() ?? false,
+  syncTemplateCanvasInputs: () => templateController?.syncCanvasInputs(),
+  renderEmptyTemplateWorkspace: () => {
+    const modeName = activeMode === APP_MODES.CLOTHES ? "옷" : "가구";
+    prepareGuideViewer(`${modeName} 모드: 종류와 파트를 선택하고 이미지를 적용하세요.`);
+    setCurrentResultSnapshot(null);
+    updateSaveButtonState(false);
+    setPaletteVisibility(false);
+    updateViewerNote();
+  },
+  getTemplateSnapshot: () => {
+    if (activeMode === APP_MODES.CLOTHES) return clothesSnapshot;
+    if (activeMode === APP_MODES.FURNITURE) return furnitureSnapshot;
+    return null;
+  },
 });
   // -- Mode snapshot --
 const {
@@ -835,6 +950,12 @@ const {
   },
   setSketchbookSnapshot: (snapshot) => {
     sketchbookSnapshot = snapshot;
+  },
+  setClothesSnapshot: (snapshot) => {
+    clothesSnapshot = snapshot;
+  },
+  setFurnitureSnapshot: (snapshot) => {
+    furnitureSnapshot = snapshot;
   },
   applyModeUi,
   renderCompleted,
@@ -976,6 +1097,17 @@ submissionController = createSubmissionController({
   getIsCropStageExpanded: () => isCropStageExpanded,
   setCropStageExpanded,
   getTuningValues,
+  getSelectedTemplateCanvas: () => templateController?.getSelectedCanvas() ?? null,
+  getSelectedTemplateBBox: () => templateController?.getSelectedCanvasBBox() ?? null,
+  isTemplateMode: () => templateController?.isTemplateMode() ?? false,
+  buildCurrentTemplateCrop: () => {
+    const selection = cropSelection;
+    if (!selection) return null;
+    return normalizeStoredTemplateCrop({
+      ...selection,
+      source_filename: selectedFile?.name || null,
+    });
+  },
   getMultiActiveLayout: () => multiController?.getActiveLayout() || null,
   computeMultiPieceRects: (selection, layout) => computePieceRects(selection, layout),
   onMultiConversionStart: ({ layout, totalPieces, sourceFilename, ratio, precision }) => {
@@ -1127,6 +1259,12 @@ multiSplitCountInput?.addEventListener("change", (event) => multiController?.han
 multiLayoutSelect?.addEventListener("change", (event) => multiController?.handleLayoutChange(event));
 expandedMultiSplitCountInput?.addEventListener("change", (event) => multiController?.handleSplitCountChange(event));
 expandedMultiLayoutSelect?.addEventListener("change", (event) => multiController?.handleLayoutChange(event));
+clothesItemInput?.addEventListener("change", (event) => templateController?.handleItemChange(event));
+clothesCanvasInput?.addEventListener("change", (event) => templateController?.handleCanvasChange(event));
+furnitureItemInput?.addEventListener("change", (event) => templateController?.handleItemChange(event));
+furnitureCanvasInput?.addEventListener("change", (event) => templateController?.handleCanvasChange(event));
+expandedClothesCanvasInput?.addEventListener("change", (event) => templateController?.handleCanvasChange(event));
+expandedFurnitureCanvasInput?.addEventListener("change", (event) => templateController?.handleCanvasChange(event));
 multiPieceTabBar?.addEventListener("click", (event) => multiController?.handlePieceTabBarClick(event));
 ratioInput?.addEventListener("change", () => {
   if (activeMode === APP_MODES.MULTI_SKETCHBOOK && cropImage?.naturalWidth) {

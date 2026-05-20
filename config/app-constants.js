@@ -16,6 +16,8 @@ const APP_MODES = {
   SKETCHBOOK: "sketchbook",
   BOOK: "book",
   MULTI_SKETCHBOOK: "multi_sketchbook",
+  CLOTHES: "clothes",
+  FURNITURE: "furniture",
 };
 
 const MULTI_SPLIT_OPTIONS = [2, 4, 6, 8, 10];
