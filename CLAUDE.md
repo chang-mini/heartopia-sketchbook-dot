@@ -47,7 +47,7 @@ styles/          ← Component-scoped CSS files, imported via styles/main.css
 
 - **SKETCHBOOK** (`APP_MODES.SKETCHBOOK`): single-image conversion with user-chosen ratio and precision.
 - **BOOK** (`APP_MODES.BOOK`): fixed 16:9 / precision 4, split into book segments (`back_cover`, `spine`, `front_cover`, `full`). Each segment is converted separately and merged into a single 150×84 grid.
-- **MULTI_SKETCHBOOK** (`APP_MODES.MULTI_SKETCHBOOK`): one image split into N independent sketchbook pieces (N ∈ {2, 4, 6, 8, 10}). User picks ratio/precision (per-piece) and layout (e.g., 2×2 for N=4, 2×3/3×2 for N=6). Overall crop ratio auto-computed as `(cols × piece_w):(rows × piece_h)`. Each piece is a fully independent dot-art; viewer has N+1 tabs (N pieces + "전체" mosaic preview). Save exports 1 bundle file (`*_bundle.dudot.json`, restores to MULTI mode) + N per-piece files (`*_multi_{N}x{i}.dudot.json`, each opens as standalone SKETCHBOOK).
+- **MULTI_SKETCHBOOK** (`APP_MODES.MULTI_SKETCHBOOK`): one image split into N independent sketchbook pieces (N ∈ {2, 4, 6, 8, 9, 10, 12}). User picks ratio/precision (per-piece) and layout (e.g., 2×2 for N=4, 2×3/3×2 for N=6, 3×3 for N=9, 3×4/4×3 for N=12). Overall crop ratio auto-computed as `(cols × piece_w):(rows × piece_h)`. Each piece is a fully independent dot-art; viewer has N+1 tabs (N pieces + "전체" mosaic preview). Save exports 1 bundle file (`*_bundle.dudot.json`, restores to MULTI mode) + N per-piece files (`*_multi_{N}x{i}.dudot.json`, each opens as standalone SKETCHBOOK).
 
 ### Save file format
 

@@ -20,7 +20,7 @@ const APP_MODES = {
   FURNITURE: "furniture",
 };
 
-const MULTI_SPLIT_OPTIONS = [2, 4, 6, 8, 10];
+const MULTI_SPLIT_OPTIONS = [2, 4, 6, 8, 9, 10, 12];
 
 const MULTI_LAYOUTS = {
   2: [
@@ -38,9 +38,16 @@ const MULTI_LAYOUTS = {
     { rows: 2, cols: 4, label: "2×4", locked: false },
     { rows: 4, cols: 2, label: "4×2", locked: false },
   ],
+  9: [
+    { rows: 3, cols: 3, label: "3×3", locked: true },
+  ],
   10: [
     { rows: 2, cols: 5, label: "2×5", locked: false },
     { rows: 5, cols: 2, label: "5×2", locked: false },
+  ],
+  12: [
+    { rows: 3, cols: 4, label: "3×4", locked: false },
+    { rows: 4, cols: 3, label: "4×3", locked: false },
   ],
 };
 
